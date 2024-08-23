@@ -1,0 +1,132 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+results_by_module=readRDS('/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/hsPBMC_Late_all_mods_Go_results_by_module.RDS')
+allmods=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/hsPBMC_Late_all_mods.csv")
+
+```
+
+```{r}
+library(tidyverse)
+
+table(allmods$Module)%>% as.data.frame()-> modegene
+modegene$Var2<-factor(paste0('module',modegene$Var1),level=paste0('module',modegene$Var1))
+
+vlines <- 0.5 + seq_len(nlevels(factor(modegene$Var1))) 
+print(vlines)
+ggplot( modegene)+geom_col(aes(Var2,Freq),fill="black")+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank())+ylab('Gene Number')+xlab("")
+```
+
+```{r}
+Metaenrich=read.csv("Metaenrich.csv")
+```
+```{r}
+Late=Metaenrich[grep("Late",Metaenrich$X),]
+```
+```{r}
+EN=Late[,c("Description","InTerm_InList","X")]
+```
+```{r}
+EN$Name=gsub("Late_","",EN$X)
+```
+
+
+```{r}
+top_paths <- lapply(results_by_module, function(x) {
+  
+    x1=filter(x,ONTOLOGY=="BP")
+    top10<- arrange(x1,p.adjust) %>%head(2)
+
+ return(top10)
+})
+
+
+top_paths_df <- do.call(rbind, top_paths)
+top_paths_df$Label <- rep(names(top_paths), sapply(top_paths, nrow))
+
+
+# results_by_module
+head(top_paths_df)
+```
+```{r}
+
+```
+```{r}
+subMK=results_by_module$`Module-MK`
+head(subMK,100)
+subMK2=subMK[grep("GO:0030168|GO:0070527",subMK$ID),]
+subMK2$Label<-"MK"
+subMK2$Name<-"MK"
+```
+
+```{r}
+top_paths_df$Name=gsub("Module-","",top_paths_df$Label)
+```
+
+```{r}
+top_paths_df<-top_paths_df[grep("NK|Tcell|Mono",top_paths_df$Name),]
+```
+
+```{r}
+colnames(EN)<-c("Description","Count","Label","Name")
+```
+
+
+```{r}
+Gene=rbind(top_paths_df[,c("Description","Count","Label","Name")],EN)
+Gene=rbind(subMK2[,c("Description","Count","Label","Name")],Gene)
+```
+
+```{r}
+Gene$Name<-factor(Gene$Name,levels = c("ERY","MK", "STEM","Mono","Bcell","NK","Tcell"))
+unique(Gene$Description)
+```
+
+```{r}
+Gene$Description<-factor(Gene$Description,levels = c( "erythrocyte development","regulation of ossification","platelet activation","platelet aggregation","blood vessel development" ,"regulation of cell growth","myeloid leukocyte activation", "positive regulation of cytokine production", "positive regulation of cell adhesion"   ,    "regulation of proteolysis","cell killing","leukocyte mediated cytotoxicity","adaptive immune response"   ,                "T cell differentiation"  ))
+```
+
+```{r}
+library(ggplot2)
+
+
+
+background_df <- expand.grid(
+  Description = unique(Gene$Description),
+  Label = unique(Gene$Name)
+)
+
+
+background_df$fill <- (1:nrow(background_df)) %% 2
+
+
+P1=ggplot() +
+  geom_tile(data = background_df, aes(x = Description, y = Label, fill = as.factor(fill)), alpha = 0.5) +
+  scale_fill_manual(values = c("white", "gray")) +
+  geom_point(data = Gene, aes(x = Description, y = Name, size = Count),color="red") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  xlab('') +
+  ylab('')+coord_flip()
+P1
+ggsave("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure2/Late_enrich.pdf")
+```
+
+```{r}
+
+```
+

@@ -1,0 +1,201 @@
+---
+title: "Untitled"
+author: "MLP"
+date: "2023-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+TCRA_chainlong=read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRA_chainlong.csv")
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer )
+library(ComplexHeatmap)
+TCRA=TCRA_chainlong
+```
+
+```{r}
+TRAVlist_values<-read.csv("TCRBCRchain200/TRAVlist_values.csv")
+```
+
+```{r}
+TCRA$variable<-factor(TCRA$variable,level=TRAVlist_values$x)
+
+library(dplyr)
+
+
+
+split_TCRA<- strsplit(TCRA$Sample, "_")
+
+
+TCRA$CellType <- sapply(split_TCRA, "[", 1)
+TCRA$AdjusteID<- sapply(split_TCRA, "[", 2)
+
+TCRA$Organ <- substr(TCRA$AdjusteID, 1, 1)
+TCRA$Sample<-factor(TCRA$Sample,level=rev(sort(unique(TCRA$Sample))))
+TCRA2 <- TCRA %>% group_by(variable) %>% filter(sum(as.numeric(value) )!= 0) %>%ungroup()
+TCRA2$Week<-substring(TCRA2$AdjusteID,2,5) %>% as.numeric()
+TCRA2$Stage<-ifelse(TCRA2$Week<=28,'Early','Late')
+
+
+library(dplyr)
+
+TCRA2 <- TCRA2 %>% 
+  mutate(Organ = case_when(
+    Organ == "B" ~ "PBMC",
+    Organ == "L" ~ "Liver",
+    Organ == "S" ~ "Spleen",
+    Organ == "T" ~ "Thymus",
+    TRUE ~ Organ  
+  ))
+TCRA2$Organ_Stage=paste0(TCRA2$Stage,'_',TCRA2$Organ)
+```
+```{r}
+TCRA2$Organ_Stage<-factor(TCRA2$Organ_Stage,levels = c("Early_PBMC"  , "Late_PBMC",  "Early_Liver", "Early_Thymus" ,  "Early_Spleen" ))
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(TCRA2, CellType == "Naïve CD4 T")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P2A=subset(TCRA2,CellType=="Naïve CD4 T") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRA_ratio in CD4')+scale_fill_npg()
+ P2A
+ ggsave(plot = P2A,'Gao_TCRBCRchain_Figure/CD4TCRA.pdf',width = 20,height = 40)
+```
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(TCRA2, CellType == "Naïve CD8 T")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P8A=subset(TCRA2,CellType=="Naïve CD8 T") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRA_ratio in CD8')+scale_fill_npg()
+ P2A
+ ggsave(plot = P8A,'Gao_TCRBCRchain_Figure/CD8TCRA.pdf',width = 20,height = 40)
+```
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P284=subset(TCRA2)%>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_bar(stat = 'identity',position = "dodge")+ 
+  # theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(CellType~variable, scales = "free", space='free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))+xlab("")+ylab("Composition (%)")+scale_fill_npg()
+ P284
+```
+
+
+```{r}
+# First, calculate mean and se for each group
+data_summary <- TCRA2 %>%
+  group_by(CellType, variable, Organ_Stage) %>%
+  summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+
+# Define dodge width
+dodge <- position_dodge(width = 0.9)
+
+# Then plot
+P284 <- ggplot(data_summary, aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+  geom_bar(stat = "identity", position = dodge) +
+  geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+  stat_compare_means(data = data_summary, comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(CellType ~ variable, scales = "free", space = 'free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        strip.text.x =  element_blank()) + # Remove facet labels
+  xlab("") +
+  ylab("Composition (%)") +
+  scale_fill_npg()
+
+P284
+```
+```{r}
+ggsave(plot=P284,"Gao_TCRBCRchain_Figure/TCRA_merge.pdf",width = 30,height = 10)
+```
+
+

@@ -1,0 +1,125 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-10-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+#----R load----
+### Load R packages
+```{r}
+library(tidyverse)
+library(pheatmap)
+```
+
+### Load save Data
+```{r}
+# load("/data1/maolp/Codeman/Project/Main_Gao_ScanpyProject20231130/Gao_plot/Figure3_TCRBCR_CDR3/DATA/MainTCR2_20231028.RData")
+```
+
+#----Data load----
+
+#### load Raw TCR
+
+```{r}
+TCRdir="TCR_all/"
+TCRsamples=list.files(path = TCRdir,"csv")
+AllTCR=data.frame()
+for (line in TCRsamples) {
+#   print(line)
+  name=gsub("_TCR_filtered_contig_annotations.csv","",line)
+  # print(name)
+  if (!name %in% c("C27","Z28")){
+     Test_TCR<-read.csv(file.path(TCRdir,line))
+     Test_TCR$barcodename=paste0(name,"_",Test_TCR$barcode)
+     Test_TCR$Group<-name
+     AllTCR=rbind(AllTCR,Test_TCR)
+  }
+ 
+}
+head(AllTCR)
+```
+
+
+####Load IMGT
+
+```{r}
+TRAIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRAgenelocus.csv')
+TRBIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRBlocus.csv')
+TRBJIMGT=TRBIMGT[grep("TRBJ",TRBIMGT$IMGT_gene_name),]
+TRAJIMGT=TRAIMGT[grep("TRAJ",TRAIMGT$IMGT_gene_name),]
+```
+
+#### Load obs
+
+```{r}
+TCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/TCRobs.csv")
+TCRobs
+```
+
+```{r}
+subTRA=AllTCR[AllTCR$chain=="TRA",]
+subTRB=AllTCR[AllTCR$chain=="TRB",]
+```
+
+
+```{r}
+subTRBobs<-merge(subTRB,TCRobs,by.x="barcodename",by.y="Cellname")
+```
+```{r}
+colnames(subTRBobs)[grep("call",colnames(subTRBobs))] %>% .[grep("_1",.)]
+```
+
+
+
+
+```{r}
+subTRBobs[,c("cdr3","IR_VDJ_1_junction_aa")]
+subTRBobs2<-subTRBobs[!duplicated(subTRBobs$barcodename),]
+```
+
+### Get TCRB
+
+```{r}
+subVDJ=subTRBobs2[,c("AdjustedID","New_Body",colnames(subTRBobs2)[grep("call",colnames(subTRBobs))] %>% .[grep("_1",.)])]
+# subVDJ$Week=
+```
+### Get TCRA
+```{r}
+subTRA=subTRBobs2[,c("AdjustedID","New_Body",colnames(subTRBobs2)[grep("call",colnames(subTRBobs))]
+                     %>% .[grep("_1",.)])] 
+# subTRA=
+```
+
+
+
+
+```{r}
+unique(subVDJ$AdjustedID)
+subVDJ$Week=substring(subVDJ$AdjustedID,2,5) %>% as.numeric()
+subVDJ$Satge<-ifelse(subVDJ$Week>26,"Late","Early")
+# subVDJ$OrganStage<-paste0(subVDJ$Satge,"_",subVDJ$New_Body)
+```
+
+```{r}
+subVDJ$TRBVJ=paste0(subVDJ$IR_VDJ_1_v_call,"_",subVDJ$IR_VDJ_1_j_call)
+```
+
+```{r}
+table(subVDJ$AdjustedID,subVDJ$IR_VJ_1_j_call) %>% as.data.frame()
+subTRBh1 = subVDJ[grep("B", subVDJ$AdjustedID), ]
+TRBJ =table(subVDJ$AdjustedID,subVDJ$IR_VJ_1_j_call) %>% as.data.frame()%>% arrange(desc(Freq))
+TRBVJ$Per = TRBVJ$Freq / sum(TRBVJ$Freq) * 100
+```
+
+```{r}
+
+```
+

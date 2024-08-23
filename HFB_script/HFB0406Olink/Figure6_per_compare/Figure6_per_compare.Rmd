@@ -1,0 +1,559 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list=ls())
+```
+
+```{r}
+adata1_obs <- read.csv('/home/maolp/Allcount//All_scanpyData/UmapData//adata1_umap_obsdata.csv')
+```
+
+```{r}
+unique(adata1_obs$Last_cell_type)
+```
+```{r}
+Sobs=subset(adata1_obs,Cell_lineage!="MK/ERY")
+tab2 <- table(Sobs$Last_cell_type, Sobs$AdjustedID)
+
+
+tab_proportion2 <- prop.table(tab2, margin=2)*100
+write.csv(tab_proportion2 ,"Results/CD45_in_celltype.csv")
+```
+
+```{r}
+alldata=table(adata1_obs$Last_cell_type,adata1_obs$AdjustedID)
+write.csv(alldata,"Results/alldata.csv")
+alldata<-alldata
+
+tab <- table(adata1_obs$Last_cell_type, adata1_obs$AdjustedID)
+
+# 计算每个AdjustedID中每个Last_cell_type的占比
+tab_proportion <- prop.table(tab, margin=2)*100
+tab_proportion_rounded <- round(tab_proportion, 2)
+
+
+tab_proportion
+colSums(tab_proportion_rounded )
+write.csv(tab_proportion,"Results/All_proportion.csv")
+write.csv(tab_proportion_rounded,"Results/All_proportion2.csv")
+```
+
+```{r}
+library(dplyr)
+
+
+
+# mapping_dict <- c(
+#   "CXCR5- Naïve B" = "CXCR5-B",
+#   "CXCR5+ Naïve B" = "CXCR5+B",
+#   "CD56highCD16low NK" = "Mature NK",
+#   "CX3CR1+ NK" = "Immature NK",
+#   "CXCR6+ NK" = "Immature NK",
+#   "Th17like_INNATE_T" = "Naïve CD4 T",
+#   "NK T" = "CD8 T",
+#   "Gamma Delta V2 T" = "CD3+double negative T",
+#   "Gamma Delta V1 T" = "CD3+double negative T",
+#   "Naïve CD8 T" = "Naïve CD8 T",
+#   "Tem" = "CD4 T",
+#   "Treg" = "Naïve CD4 T",
+#   "Naïve CD4 T" = "Naïve CD4 T",
+#     "abT(entry)" = "abT(entry)",
+#    "DN(Q) T" = "CD3+double negative T",
+#   "DP(Q) T" = "CD3+double positive T",
+#   "DP(P) T" = "CD3+double positive T"
+# )
+
+mapping_dict <- c(
+  "CXCR5- Naïve B" = "CXCR5-B",
+  "CXCR5+ Naïve B" = "CXCR5+B",
+  "CD56highCD16low NK" = "Immature NK",
+  "CX3CR1+ NK" = "Mature NK",
+  "CXCR6+ NK" = "Immature NK",
+  "Th17like_INNATE_T" = "Innate T",
+  "NK T" = "Innate T",
+  "GNG4 +CD8aa+T"="Innate T",
+  "Gamma Delta V2 T" = "Innate T",
+  "Gamma Delta V1 T" = "Innate T",
+  "Naïve CD8 T" = "CD8 T",
+  "Tem" = "CD4 T",
+  "Treg" = "CD4 T",
+  "Naïve CD4 T" = "CD4 T",
+    "abT(entry)" = "abT(entry)",
+   "DN(Q) T" = "CD3+double negative T",
+  "DP(Q) T" = "CD3+double positive T",
+  "DP(P) T" = "CD3+double positive T"
+)
+
+
+
+adata1_obs$Last_cell_type2 <- recode(adata1_obs$Last_cell_type, !!!mapping_dict, .default = "Others")
+
+thymus=subset(adata1_obs,new_Body=="Thymus")
+```
+
+
+```{r}
+grouped_data <-adata1_obs %>%
+  group_by( AdjustedID,Last_cell_type2,new_Body, Cell_lineage) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count) * 100) %>%
+  mutate(Cell_lineage = factor(Cell_lineage))
+```
+
+```{r}
+library(dplyr)
+
+
+
+df <- grouped_data %>%
+  group_by(AdjustedID) %>%
+  mutate(count2 = sum(count)) %>%
+  ungroup()
+
+
+df <- df %>%
+  mutate(percentage = (count / count2) * 100)
+
+
+print(df)
+```
+```{r}
+library(dplyr)
+library(tidyr)
+
+
+df <- grouped_data %>%
+  group_by(AdjustedID) %>%
+  mutate(count2 = sum(count)) %>%
+  ungroup()
+
+
+df <- df %>%
+  mutate(percentage = (count / count2) * 100)
+# First, remove any list-columns if they exist
+df2 <- df %>% mutate(across(where(is.list), as.character))
+
+
+df2<-df %>%
+  select(AdjustedID, Last_cell_type2, percentage)  
+library(tidyr)
+library(dplyr)
+library(tidyr)
+library(dplyr)
+
+
+
+df2_unique <- df2 %>%
+  group_by(AdjustedID, Last_cell_type2) %>%
+  summarise(percentage = mean(percentage)) %>%
+  ungroup()
+
+
+wide_df2 <- df2_unique %>%
+  spread(key = Last_cell_type2, value = percentage)
+
+
+print(wide_df2)
+write.csv(wide_df2,"wide_df2_haveCD45.csv")
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+
+convert_to_wide_and_write_csv <- function(data_frame, output_file_name) {
+  
+
+  data_frame <- data_frame %>%
+    group_by(AdjustedID) %>%
+    mutate(count2 = sum(count)) %>%
+    ungroup() %>%
+    mutate(percentage = (count / count2) * 100)
+  
+
+  data_frame <- data_frame %>% mutate(across(where(is.list), as.character))
+  
+
+  data_frame <- data_frame %>%
+    select(AdjustedID, Last_cell_type2, percentage)
+  
+
+  data_frame_unique <- data_frame %>%
+    group_by(AdjustedID, Last_cell_type2) %>%
+    summarise(percentage = mean(percentage), .groups = 'drop')
+  
+
+  wide_data_frame <- data_frame_unique %>%
+    spread(key = Last_cell_type2, value = percentage)
+  
+
+  print(wide_data_frame)
+  
+  # 写入CSV文件
+  write.csv(wide_data_frame, output_file_name, row.names = FALSE)
+  
+
+  return(wide_data_frame)
+}
+
+
+result_df1 <- convert_to_wide_and_write_csv(grouped_data, "wide_df2_all.csv")
+```
+
+```{r}
+result_df2 <- convert_to_wide_and_write_csv(subset(grouped_data,Cell_lineage!="MK/ERY"), "wide_df2_onlyCD45.csv")
+```
+```{r}
+rowSums(result_df1[,-1],na.rm = T)
+```
+
+```{r}
+grouped_data 
+library(dplyr)
+
+
+group_counts <- grouped_data%>%
+  group_by(AdjustedID) %>%
+  summarise(count = n())
+
+# 计算Last+cell_type的数量占比
+group_counts <- group_counts %>%
+  mutate(percentage = count / sum(count) * 100)
+```
+
+```{r}
+library(ggplot2)
+P5 <- ggplot(grouped_data, aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+      
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P5
+```
+```{r}
+
+color_mapping <- c(
+  "CXCR5-B" = "#FF0000",
+  
+  "CXCR5+B" = "#FF9B9B",
+  "Immature NK" = "#13C0DF",
+  "Mature NK" = "#077E97",
+  "Innate T" = "#00C000",
+  "Gamma Delta T" = "#0000FF",
+  "Naïve CD8 T" = "#FF6000",
+    "CD8 T" = "#FF6000",
+  "Effective memory CD4+T" = "#DE8BF9",
+  "Treg" = "#DE8BD7",
+  "Naïve CD4 T" = "#B856D7",
+    "CD4 T" = "#B856D7",
+   "abT(entry)" = "#6a73cf",
+  "CD3+double positive T" = "#A2A200",
+  "CD3+double negative T"="#E8E800",
+  "Others" = "#8C8ED2"   # 为“Others”也指定一个颜色
+)
+```
+
+
+```{r}
+grouped_data
+```
+```{r}
+grouped_data$new_Body<-factor(grouped_data$new_Body,levels = c("PBMC","Liver","Thymus","Spleen"))
+```
+
+```{r}
+unique(grouped_data$Last_cell_type2)
+grouped_data$Last_cell_type2<-factor(grouped_data$Last_cell_type2,levels = c( "CXCR5-B","CXCR5+B", "Immature NK","Mature NK","CD8 T","CD4 T","Innate T","CD3+double positive T","CD3+double negative T","abT(entry)","Others"))
+```
+
+
+```{r}
+
+P4 <- ggplot(grouped_data, aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values = color_mapping) +  
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P4
+```
+```{r}
+library(tidyverse)
+test1=subset(grouped_data,Cell_lineage!="MK/ERY") %>% subset(new_Body=="Thymus")
+```
+
+```{r}
+subset(grouped_data,Cell_lineage!="MK/ERY")
+```
+```{r}
+grouped_data
+```
+```{r}
+S1=grouped_data[!grouped_data$AdjustedID %in% c("B11.6_P24","B22.4_P23","L10.1_P25","T10.1_P25"),]
+```
+```{r}
+unique(grouped_data$AdjustedID )
+```
+```{r}
+S1$Last_cell_type2<-factor(S1$Last_cell_type2,levels = c( "CXCR5-B","CXCR5+B", "Immature NK","Mature NK","CD8 T","CD4 T","Innate T","CD3+double negative T","CD3+double positive T","abT(entry)","Others"))
+```
+
+```{r}
+S1$new_Body<-factor(S1$new_Body,levels = c("PBMC","Liver","Thymus","Spleen"))
+```
+
+```{r}
+
+
+# print(S1_percentages)
+```
+
+```{r}
+library(tidyr)
+
+library(dplyr)
+
+
+S1_grouped <- S1 %>%
+  group_by(AdjustedID, Last_cell_type2) %>%
+  summarize(count = n())  
+
+
+S1_totals <- S1_grouped %>%
+  group_by(AdjustedID) %>% 
+  summarize(total_count = sum(count))
+
+
+S1_percentages <- S1_grouped %>%
+  left_join(S1_totals, by = "AdjustedID") %>%
+  mutate(percentage = count / total_count * 100)
+S1_wide <- S1_percentages %>% select(
+AdjustedID,Last_cell_type2,percentage) %>% 
+  pivot_wider(
+    names_from = Last_cell_type2,
+    values_from = percentage
+  )
+
+
+print(S1_wide)
+rowSums(S1_wide[,-1],na.rm = T)
+write.csv(S1_wide,"Per_all.csv")
+
+
+```
+
+
+
+```{r}
+# S2_wide <- process_data(subset(S1,Cell_lineage!="MK/ERY"))
+# print(colSums(S2_wide[,-1], na.rm = TRUE))
+
+```
+```{r}
+# All_countdata
+```
+
+```{r}
+# S1_count <- S1[,c(1,2,5)] %>%
+ #    select(AdjustedID, Last_cell_type2, count) %>% 
+ #    pivot_wider(
+ #      names_from = AdjustedID,
+ #      values_from = count
+ #    )
+All_countdata <-  S1[,c(1,2,5)]%>%
+  group_by(AdjustedID, Last_cell_type2) %>%
+  summarize(count = sum(count))%>%
+    select(AdjustedID, Last_cell_type2, count) %>% 
+    pivot_wider(
+      names_from = AdjustedID,
+      values_from = count
+    )
+
+print(All_countdata)
+write.csv(All_countdata,"Results/S1_Allcount.csv")
+```
+
+
+```{r}
+CD45_countdata <-subset(S1,Cell_lineage!="MK/ERY") %>%  .[,c(1,2,5)]%>%
+  group_by(AdjustedID, Last_cell_type2) %>%
+  summarize(count = sum(count))%>%
+    select(AdjustedID, Last_cell_type2, count) %>% 
+    pivot_wider(
+      names_from = AdjustedID,
+      values_from = count
+    )
+
+print(CD45_countdata)
+write.csv(CD45_countdata,"Results/S2_CD45_countdata.csv")
+```
+```{r}
+library(dplyr)
+library(tidyr)
+
+calculate_percentages <- function(df) {
+  # Convert data from wide to long format, and remove NA
+  long_df <- df %>%
+    pivot_longer(
+      cols = -Last_cell_type2,
+      names_to = "ID",
+      values_to = "Count"
+    ) %>%
+    drop_na()
+
+  # Calculate the total for each ID
+  total_counts <- long_df %>%
+    group_by(ID) %>%
+    summarize(Total = sum(Count))
+
+  # Join the totals back to the long dataframe and calculate percentages
+  percentage_df <- long_df %>%
+    left_join(total_counts, by = "ID") %>%
+    mutate(Percentage = Count / Total * 100)
+
+  # Convert the data back to wide format
+  wide_df <- percentage_df %>%
+    select(-Count, -Total) %>%
+    pivot_wider(
+      names_from = ID,
+      values_from = Percentage
+    )
+
+  return(wide_df)
+}
+```
+
+
+```{r}
+S1_wide <- calculate_percentages(All_countdata)
+write.csv(S1_wide, "Results/S1_allcount_percentage.csv", row.names = FALSE)
+S2_wide <- calculate_percentages(CD45_countdata)
+write.csv(S2_wide , "Results/S2_CD45_percentage.csv", row.names = FALSE)
+```
+
+```{r}
+# colSums(wide_df[,-1],na.rm = T)
+```
+```{r}
+# S2_wide
+```
+
+
+
+```{r}
+unique(adata1_obs$Last_cell_type)
+```
+```{r}
+S1$Last_cell_type2
+```
+
+```{r}
+library(ggplot2)
+P6 <- ggplot(S1, aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values = color_mapping) +   # 这里添加了scale_fill_manual函数
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P6
+ggsave(plot=P6,"Results/Per_Rmsample_all.pdf",width = 12,height = 6)
+```
+
+```{r}
+P7 <- ggplot(subset(S1,Cell_lineage!="MK/ERY"), aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values = color_mapping) +  
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P7
+ggsave(plot=P7,"Results/PerX__Rmsample_onlyCD45.pdf",width = 12,height = 6)
+```
+
+```{r}
+# 在ggplot中使用这个颜色映射
+P5 <- ggplot(subset(grouped_data,Cell_lineage!="MK/ERY"), aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values = color_mapping) +   
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P5
+```
+
+```{r}
+P5 <- ggplot(subset(grouped_data,Cell_lineage!="MK/ERY"), aes(x = AdjustedID, y = count)) +
+  geom_bar(aes(fill = Last_cell_type2), stat = "identity", position = "fill") +
+  facet_grid(. ~ new_Body, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values = color_mapping) +   
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "bottom") +  
+  ylab("Composition (%)") +
+  scale_y_continuous(labels = seq(0, 100, by = 25)) +
+  xlab("")+labs(fill="Cell_type")
+P5
+```
+
+```{r}
+system("mkdir -p /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure6/Sup6_per")
+```
+
+```{r}
+ggsave(plot=P5,"/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure6/Sup6_per/Per_onlyCD45.pdf",width = 12,height = 6)
+```
+```{r}
+ggsave(plot=P4,"/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure6/Sup6_per/Per_All.pdf",width = 12,height = 6)
+```
+```{r}
+system("cp Results/*csv /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure6/Sup6_per")
+system("cp *pdf /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure6/Sup6_per")
+```
+

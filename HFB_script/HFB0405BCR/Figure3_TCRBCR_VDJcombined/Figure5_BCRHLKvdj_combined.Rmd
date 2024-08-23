@@ -1,0 +1,1851 @@
+---
+title: "CD8 BCR"
+output: html_document
+date: "2023-10-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+#----R load----
+### Load R packages
+```{r}
+library(tidyverse)
+library(pheatmap)
+```
+
+#----Data load----
+
+
+
+
+####Load IMGT
+
+```{r}
+# https://www.imgt.org/IMGTrepertoire/index.php?section=LocusGenes&repertoire=GeneOrder&species=human&group=IGK
+IGHVIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGHV.txt',sep="\t")
+IGHJIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGKJ.txt',sep="\t")
+IGKVIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGKV.txt',sep="\t")
+IGLJIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGLJ.txt',sep="\t")
+IGLKIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGLK.txt',sep="\t")
+IGLVIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGLV.txt',sep="\t")
+IGHDIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGHD.csv',sep=",")
+IGKJIMGT=data.frame(IMGT_gene_name=paste0("IGKJ",1:5),order=seq(77,81))
+```
+
+#### Load obs
+
+```{r}
+BCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/BCRobs.csv")
+BCRobs
+# BCRobs<-subset(BCRobs,Last_cell_type=="Naïve CD8 T")
+```
+
+```{r}
+# subBCRK=AllBCR[AllBCR$chain=="BCRK",]
+# subBCRH=AllBCR[AllBCR$chain=="BCRH",]
+```
+
+
+```{r}
+subBCRHobs<-BCRobs
+```
+```{r}
+colnames(subBCRHobs)[grep("call",colnames(subBCRHobs))] %>% .[grep("_1",.)]
+```
+
+
+
+
+```{r}
+# subBCRHobs[,c("cdr3","IR_VDJ_1_junction_aa")]
+# subBCRHobs2<-subBCRHobs[!duplicated(subBCRHobs$barcodename),]
+subBCRHobs2=subBCRHobs
+```
+
+### Get BCRB
+
+```{r}
+subVDJ=subBCRHobs2[,c("AdjustedID","New_Body",colnames(subBCRHobs2)[grep("call",colnames(subBCRHobs))] %>% .[grep("_1",.)])]
+# subVDJ$Week=
+```
+### Get BCRK
+```{r}
+subBCRK=subBCRHobs2[,c("AdjustedID","New_Body",colnames(subBCRHobs2)[grep("call",colnames(subBCRHobs))]
+                     %>% .[grep("_1",.)])] 
+# subBCRK=
+```
+
+
+
+
+```{r}
+unique(subVDJ$AdjustedID)
+subVDJ$Week=substring(subVDJ$AdjustedID,2,5) %>% as.numeric()
+subVDJ$Satge<-ifelse(subVDJ$Week>26,"Late","Early")
+subVDJ$OrganStage<-paste0(subVDJ$Satge,"_",subVDJ$New_Body)
+```
+
+```{r}
+subVDJ$BCRHVJ=paste0(subVDJ$IR_VDJ_1_v_call,"_",subVDJ$IR_VDJ_1_j_call)
+```
+
+```{r}
+table(subVDJ$AdjustedID,subVDJ$BCRHVJ) %>% as.data.frame()
+```
+
+
+
+#----All BCR Freq----
+
+
+### All percentage heatmap
+
+```{r}
+subBCRHh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+```
+
+```{r}
+subBCRHh1 = subVDJ[grep("B", subVDJ$AdjustedID), ]
+BCRHVJ = table(subBCRHh1$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+BCRHVJ$Per = BCRHVJ$Freq / sum(BCRHVJ$Freq) * 100
+PBMCBCRHVJ_separated <- BCRHVJ %>%
+  separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+
+PBMCBCRHVJ_wide <- PBMCBCRHVJ_separated %>% select(-Freq) %>%
+  spread(key = Vgene, value = Per)
+rownames(PBMCBCRHVJ_wide) <- PBMCBCRHVJ_wide$Jgene
+PBMCBCRHVJ_wide <- PBMCBCRHVJ_wide[, -1]
+PBMCBCRHVJ_wide[is.na(PBMCBCRHVJ_wide)] <- 0
+library(pheatmap)
+pheatmap(
+  PBMCBCRHVJ_wide,
+  border_color = "white",
+  color = rev(colorRampPalette(
+    c('#C6403D', "#f6c619", 'white', '#246BAE')
+  )(100))
+)
+```
+
+
+### All BCR VDJheatmap
+
+#### Main Function
+
+##### BCRHIMGTsub
+```{r}
+BCRHIMGTsub=IGHVIMGT[IGHVIMGT$IMGTgenename %in% subVDJ$IR_VDJ_1_v_call,] %>% arrange(IMGTgeneorder)
+colnames(BCRHIMGTsub)<-c("IMGT_gene_name","IMGTgeneorder")
+```
+
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+VDJheatmap <- function(data,pattern, BCRHinIMGT=BCRHIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRHVJ = table(sub_data$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRHVJ$Per = BCRHVJ$Freq / sum(BCRHVJ$Freq)*100
+  
+  separated_data <- BCRHVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+missing_cols <- setdiff(BCRHinIMGT$IMGT_gene_name, colnames(wide_data))
+
+
+for(col in missing_cols) {
+  wide_data[[col]] <- 0
+}
+  wide_data<-wide_data[,BCRHinIMGT$IMGT_gene_name]
+  pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  return(wide_data)
+}
+```
+
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+VDJheatmap_data <- function(data,pattern, BCRHinIMGT=BCRHIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRHVJ = table(sub_data$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRHVJ$Per = BCRHVJ$Freq / sum(BCRHVJ$Freq)
+  
+  separated_data <- BCRHVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  return( wide_data)
+  # wide_data<-wide_data[,BCRHinIMGT$IMGT_gene_name]
+  # pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  # return(wide_data)
+}
+```
+
+```{r}
+IGHVdata=subVDJ
+sub_IGHVdata = IGHVdata[grep("Early_PBMC", IGHVdata[["OrganStage"]]),]
+BCRHVJ = table(sub_IGHVdata$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+BCRHVJ$Per = BCRHVJ$Freq / sum(BCRHVJ$Freq)
+
+separated_IGHVdata <- BCRHVJ %>%
+  separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+
+wide_IGHVdata <- separated_IGHVdata %>% select(-Freq) %>%
+  spread(key = Vgene, value = Per)
+
+rownames(wide_IGHVdata) <- wide_IGHVdata$Jgene
+wide_IGHVdata <- wide_IGHVdata[, -1]
+wide_IGHVdata[is.na(wide_IGHVdata)] <- 0
+missing_cols <- setdiff(BCRHIMGTsub$IMGT_gene_name, colnames(wide_IGHVdata))
+# return( wide_IGHVdata)
+```
+
+
+#### Early_PBMC
+```{r}
+VDJheatmap(subVDJ,pattern =  "Early_PBMC",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_PBMC")
+```
+
+
+#### Late_PBMC no cluster
+```{r}
+VDJheatmap(subVDJ, pattern = "Late_PBMC",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Late_PBMC")
+```
+
+#### Late_PBMC cluster
+```{r}
+VDJheatmap(subVDJ, pattern = "Late_PBMC",id_col="OrganStage",cluster_col=T,cluster_row=T,title = "Late_PBMC")
+```
+####  Early_PBMC cluster
+```{r}
+VDJheatmap(subVDJ,pattern =  "Early_PBMC",id_col="OrganStage",cluster_col=T,cluster_row=,title = "Early_PBMC")
+```
+
+####  All_PBMC cluster
+```{r}
+VDJheatmap(subVDJ, "B",cluster_col=F,cluster_row=F,title = "PBMC")
+```
+
+#### Early_Liver
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Liver",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Liver")
+```
+
+#### Early_Spleen
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Spleen",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Spleen")
+```
+#### Early_Thymus
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Thymus",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Thymus")
+```
+
+
+#----Per Sample BCRH----
+
+### Get Sample percentage
+```{r}
+subBCRHh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+Sample_BCRHVJ=table(subBCRHh1$AdjustedID,subBCRHh1$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_BCRHVJ)<-c("AdjustedID","VDJ","Freq")
+
+total_freq_by_id <- Sample_BCRHVJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_BCRHVJ <- left_join(Sample_BCRHVJ, total_freq_by_id, by = "AdjustedID")
+
+
+Sample_BCRHVJ <- Sample_BCRHVJ %>% 
+  mutate(Per = Freq / total_freq*100)
+
+Sample_BCRHVJ <- Sample_BCRHVJ %>% arrange(AdjustedID)
+Sample_BCRHVJ$Week=substring(Sample_BCRHVJ$AdjustedID,2,5) %>% as.numeric()
+```
+```{r}
+subBCRK
+```
+
+
+
+
+```{r}
+unique(Sample_BCRHVJ$AdjustedID)
+```
+### Sample top BCRH
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+Sample_BCRHVJ$Week <- as.numeric(Sample_BCRHVJ$Week)
+Sample_BCRHVJ$Per <- as.numeric(Sample_BCRHVJ$Per)
+
+
+top_VDJ <- Sample_BCRHVJ %>% 
+  group_by(VDJ) %>%
+  summarise(Total_Per = sum(Per)) %>%
+  top_n(10, Total_Per) %>%
+  pull(VDJ)
+
+Sample_BCRHVJ <- Sample_BCRHVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% top_VDJ, VDJ, "Other"))
+Sample_BCRHVJ$VDJ_Top10<-factor(Sample_BCRHVJ$VDJ_Top10,levels = c(as.character(top_VDJ),"Other"))
+```
+
+
+
+
+```{r}
+table(Sample_BCRHVJ$AdjustedID)
+```
+
+#### Plot: top BCRH line 
+
+```{r}
+
+ggplot(Sample_BCRHVJ, aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  geom_line() +
+  scale_color_manual(values = c(rainbow(10), "gray")) +
+  labs(x = "Week", y = "Per", color = "VDJ") +
+  theme_classic()
+```
+### PerSample Cor BCRHV
+```{r}
+
+PBMCBCRH_cor_results <- Sample_BCRHVJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+PBMCBCRH_cor_results<-PBMCBCRH_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(PBMCBCRH_cor_results)
+subset(PBMCBCRH_cor_results,p.adjusted<0.1) %>% arrange(cor)
+PBMCBCRH_cor_results$VDJcor<-ifelse(PBMCBCRH_cor_results$p.value>0.05,"NA",ifelse(PBMCBCRH_cor_results$cor>0,"+","-"))
+```
+```{r}
+subset(PBMCBCRH_cor_results,p.adjusted<0.2)
+```
+#### Plot: top sig BCRH line 
+
+
+
+```{r}
+top_VDJ=subset(PBMCBCRH_cor_results,p.adjusted<0.1) %>% arrange(cor) %>% .$VDJ %>% .[-1]
+Sample_BCRHVJ <- Sample_BCRHVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% top_VDJ, VDJ, "Other")) %>% 
+mutate(VDJ_Top10=factor(VDJ_Top10,levels = c(as.character(top_VDJ),"Other")))
+subset(Sample_BCRHVJ,VDJ_Top10!= "Other") %>% 
+ggplot() +
+  geom_line( aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  scale_color_manual(values = c(rainbow(length(top_VDJ)), "gray")) +
+  labs(x = "Week", y = "Percentage", color = "VDJ") +
+  theme_classic()
+```
+
+```{r}
+Sample_BCRHVJ %>% arrange(desc(Per))
+```
+
+```{r}
+# 
+# PBMCBCRHVJ_separated <- BCRHVJ%>%
+#   separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+# 
+# PBMCBCRHVJ_wide <- PBMCBCRHVJ_separated %>%select(-Freq) %>% 
+#   spread(key =Vgene, value = Per)
+# rownames(PBMCBCRHVJ_wide)<-PBMCBCRHVJ_wide$Jgene
+# PBMCBCRHVJ_wide<-PBMCBCRHVJ_wide[,-1]
+# PBMCBCRHVJ_wide[is.na(PBMCBCRHVJ_wide)]<-0
+```
+```{r}
+# library(pheatmap)
+# pheatmap(PBMCBCRHVJ_wide,border_color = "white",color =rev( colorRampPalette(c('#C6403D', 'white','#246BAE'))(100)))
+```
+
+
+
+```{r}
+# intersect(BCRHIMGT$IMGT_gene_name,subVDJ$IR_VDJ_1_v_call)
+```
+
+```{r}
+# setdiff(subVDJ$IR_VDJ_1_v_call,BCRHIMGT$IMGT_gene_name)
+```
+
+
+
+
+
+### BCRHfunction Data
+
+
+```{r}
+library(ggplot2)
+library(reshape2) # for melt function
+
+VDJfun <- function(data,pattern, BCRHinIMGT=BCRHIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRHVJ = table(sub_data$BCRHVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRHVJ$Per = BCRHVJ$Freq / sum(BCRHVJ$Freq)*100
+  
+  separated_data <- BCRHVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(BCRHinIMGT$IMGT_gene_name, colnames(wide_data))
+
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  
+  wide_data <- wide_data[,BCRHinIMGT$IMGT_gene_name]
+  
+  return(wide_data)
+}
+```
+#---------------------------
+
+### IMGT_HighV-QUEST
+```{r}
+library(data.table)
+read_and_assign <- function(folder) {
+  file_path <- paste0("../Figure5_BCRIMGT/IMGT_HighV-QUEST/",folder, "/6_Junction.txt")
+  # print(file_path)
+  assign(paste0(folder, "_data"), fread( file_path ,header = T), envir = .GlobalEnv)
+}
+
+
+folders <- c("IGH", "IGK", "IGL", "IGH", "IGH")
+
+
+lapply(folders, read_and_assign)
+```
+```{r}
+library(data.table)
+read_and_assign <- function(folder) {
+  file_path <- paste0("../Figure5_BCRIMGT/IMGT_HighV-QUEST/",folder, "/6_Junction.txt")
+  # print(file_path)
+  assign(paste0(folder, "_data"), fread( file_path ,header = T), envir = .GlobalEnv)
+}
+
+
+folders <- c("IGH", "IGK", "IGL", "IGH", "IGH")
+
+
+lapply(folders, read_and_assign)
+```
+
+```{r}
+dir("../../HFB0404TCR/Figure4_TCR_IMGTCDR3/IMGT_HighV-QUEST/")
+```
+```{r}
+library(data.table)
+read_and_assign <- function(folder) {
+  file_path <- paste0("../../HFB0404TCR/Figure4_TCR_IMGTCDR3/IMGT_HighV-QUEST/",folder, "/6_Junction.txt")
+  # print(file_path)
+  assign(paste0(folder, "_data"), fread( file_path ,header = T), envir = .GlobalEnv)
+}
+
+
+folders <- c("TRA","TRB")
+
+
+lapply(folders, read_and_assign)
+```
+
+
+```{r}
+IGH_data
+median(nchar(IGH_data$`N1-REGION`))
+mean(nchar(IGH_data$`N1-REGION`))
+```
+```{r}
+median(nchar(IGH_data$`N2-REGION`))
+mean(nchar(IGH_data$`N2-REGION`))
+```
+```{r}
+mean(nchar(IGH_data$`5'J-REGION`))
+```
+```{r}
+mean(nchar(IGH_data$`3'V-REGION`))
+```
+```{r}
+mean(nchar(IGH_data$`N-REGION`))
+```
+```{r}
+mean(nchar(IGH_data$`D-REGION`))
+```
+```{r}
+calculate_mean_length <- function(data, column_name) {
+  if(!column_name %in% names(data)) {
+    stop("Column not found in the data frame")
+  }
+  
+
+  mean_length <- mean(nchar(data[[column_name]]))
+  
+
+  result <- data.frame(
+    "Region" = column_name,
+    "MeanLength" = mean_length
+  )
+  
+
+  return(result)
+}
+```
+
+
+```{r}
+IGHmean_lengths <- rbind(
+  calculate_mean_length(IGH_data, 'N1-REGION'),
+  calculate_mean_length(IGH_data, 'N2-REGION'),
+  calculate_mean_length(IGH_data, '5\'J-REGION'),
+  calculate_mean_length(IGH_data, '3\'V-REGION'),
+  calculate_mean_length(IGH_data, 'N-REGION'),
+  calculate_mean_length(IGH_data, 'D-REGION')
+)
+
+
+print(IGHmean_lengths)
+```
+```{r}
+TRAmean_lengths <- rbind(
+  calculate_mean_length(TRA_data, 'N1-REGION'),
+  calculate_mean_length(TRA_data, 'N2-REGION'),
+  calculate_mean_length(TRA_data, '5\'J-REGION'),
+  calculate_mean_length(TRA_data, '3\'V-REGION'),
+  calculate_mean_length(TRA_data, 'N-REGION'),
+  calculate_mean_length(TRA_data, 'D-REGION')
+)
+
+
+```
+
+```{r}
+TRBmean_lengths <- rbind(
+  calculate_mean_length(TRB_data, 'N1-REGION'),
+  calculate_mean_length(TRB_data, 'N2-REGION'),
+  calculate_mean_length(TRB_data, '5\'J-REGION'),
+  calculate_mean_length(TRB_data, '3\'V-REGION'),
+  calculate_mean_length(TRB_data, 'N-REGION'),
+  calculate_mean_length(TRB_data, 'D-REGION')
+)
+
+
+
+```
+
+
+```{r}
+IGKmean_lengths <- rbind(
+  calculate_mean_length(IGK_data, 'N1-REGION'),
+  calculate_mean_length(IGK_data, 'N2-REGION'),
+  calculate_mean_length(IGK_data, '5\'J-REGION'),
+  calculate_mean_length(IGK_data, '3\'V-REGION'),
+  calculate_mean_length(IGK_data, 'N-REGION'),
+  calculate_mean_length(IGK_data, 'D-REGION')
+)
+```
+```{r}
+
+data_list <- list(
+  IGH= IGH_data,
+  IGL = IGL_data,
+  IGK = IGK_data,
+ 
+  TRA = TRA_data,
+  TRB = TRB_data
+)
+
+region_names <- c('N1-REGION', 'N2-REGION', '5\'J-REGION', '3\'V-REGION', 'N-REGION', 'D-REGION')
+
+
+calculate_all_lengths <- function(data, regions) {
+  do.call(rbind, lapply(regions, calculate_mean_length, data = data))
+}
+
+mean_lengths_list <- lapply(data_list, calculate_all_lengths, regions = region_names)
+
+
+all_mean_lengths <- do.call(rbind, mean_lengths_list)
+
+all_mean_lengths$Dataset <- rep(names(mean_lengths_list), each = length(region_names))
+
+
+print(all_mean_lengths)
+library(reshape2)
+
+
+wide_all_mean_lengths <- dcast(all_mean_lengths, Region ~ Dataset, value.var = "MeanLength")
+
+# 输出结果
+print(wide_all_mean_lengths )
+
+write.csv(wide_all_mean_lengths ,"Output/Tables/AllTCRBCR_CDR3_split_lengths.csv")
+```
+
+
+```{r}
+IGLmean_lengths <- rbind(
+  calculate_mean_length(IGL_data, 'N1-REGION'),
+  calculate_mean_length(IGL_data, 'N2-REGION'),
+  calculate_mean_length(IGL_data, '5\'J-REGION'),
+  calculate_mean_length(IGL_data, '3\'V-REGION'),
+  calculate_mean_length(IGL_data, 'N-REGION'),
+  calculate_mean_length(IGL_data, 'D-REGION')
+)
+IGLmean_lengths 
+```
+
+```{r}
+
+```
+
+
+```{r}
+IGH_data
+table(IGH_data$`D-GENE and allele`)
+```
+
+
+```{r}
+
+# IGH_data$`D-GENE and allele`
+IGH_cleandata=IGH_data
+
+IGHDcleaned_strings <- gsub("^Homsap\\s+|\\*.*$", "", IGH_data$`D-GENE and allele`)
+IGHJcleaned_strings <- gsub("^Homsap\\s+|\\*.*$", "", IGH_data$`J-GENE and allele`)
+
+IGH_cleandata$Clean_IGHD<-IGHDcleaned_strings
+IGH_cleandata$Clean_IGHJ<-IGHJcleaned_strings
+print(cleaned_strings)
+IGHx1none<-subset(IGH_cleandata,Clean_IGHD!="")
+```
+
+```{r}
+
+```
+
+```{r}
+# table(IGH_data$)
+```
+
+### VDJcombined
+```{r}
+library(dplyr)
+library(tidyverse)
+library(reshape2)
+subVDJ$IR_VDH<-paste0(subVDJ$IR_VDJ_1_v_call,subVDJ$IR_VDJ_1_d_call,subVDJ$IR_VDJ_1_j_call)
+
+```
+
+#----------------
+### DJ combined
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(reshape2)
+subVDJ$IR_D<-subVDJ$IR_VDJ_1_d_call
+subVDJ$IR_D<-ifelse(subVDJ$IR_D=="","None",subVDJ$IR_D)
+# table(subVDJ$IR_VDJ_1_d_call)
+subVDJ<-subset(subVDJ,IR_D!="None")
+subVDJx1<-subset(subVDJ,IR_D="None")
+table(subVDJx1$AdjustedID)
+subVDJx1none<-subset(BCRobs,IR_VDJ_1_d_call=="")
+```
+
+```{r}
+subVDJx1gene<-subset(BCRobs,IR_VDJ_1_d_call!="")
+```
+
+```{r}
+table(subVDJx1none$New_Body,subVDJx1none$Last_cell_type)
+```
+
+
+```{r}
+table(subVDJx1none$IR_VDJ_1_d_call)
+```
+```{r}
+table(subVDJx1none$AdjustedID)
+```
+
+```{r}
+table(subVDJ$IR_D)
+grep("J",subVDJ$IR_D)
+```
+```{r}
+NewBCR=merge(IGHx1none[,c(2,87,88)],BCRobs,by.x="Sequence ID",by.y="Cellname")
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(reshape2)
+
+IGHDconvert_to_wide <- function(data, id_column, d_gene_column, j_gene_column, target_gene_column, gene_list) {
+  data$BCRHDJ <- paste0(data[[d_gene_column]], "_", data[[j_gene_column]])
+  subD_data <- data[grep("B", data[[id_column]]),]
+  BCRHDJ <- table(subD_data$BCRHDJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRHDJ$Per <- BCRHDJ$Freq / sum(BCRHDJ$Freq) * 100
+  separated_dataD <- BCRHDJ %>%
+    separate(Var1, into = c("Dgene", "Jgene"), sep = "_")
+  Dwide_data <- separated_dataD %>% select(-Freq) %>%
+    spread(key = Dgene, value = Per)
+  rownames(Dwide_data) <- Dwide_data$Jgene
+  Dwide_data <- Dwide_data[, -1]
+  Dwide_data[is.na(Dwide_data)] <- 0
+  missing_cols <- setdiff(gene_list, colnames(Dwide_data))
+  for (col in missing_cols) {
+    Dwide_data[[col]] <- 0
+  }
+  Dwide_data <- Dwide_data[, gene_list]
+  BCRHDFreq_exp <- rownames_to_column(Dwide_data, var = "Jgene")
+  BCRHDJlongexp <- melt(BCRHDFreq_exp, id.vars = "Jgene", variable.name = "Dgene", value.name = "Per")
+  BCRHDJlongexp$Sample <- paste0(BCRHDJlongexp$Dgene, "_", BCRHDJlongexp$Jgene)
+  return(BCRHDJlongexp)
+}
+
+# Use the function with your specific data frame and gene list variables
+IGHDJresult <-IGHDconvert_to_wide(NewBCR, "AdjustedID", "Clean_IGHD", "Clean_IGHJ", "IGH",IGHDIMGT$IGH[-27])
+
+
+```
+
+```{r}
+ library(dplyr)
+
+create_sample_bcrhdj <- function(input_df, id_col, bcrhdj_col, group_prefix) {
+  # Select only rows where the ID column starts with the specified prefix
+  sub_df <- input_df[grep(group_prefix, input_df[[id_col]]), ]
+
+  # Create a table of frequencies for each ID and BCRHDJ combination
+  sample_bcrhdj <- table(sub_df[[id_col]], sub_df[[bcrhdj_col]]) %>%
+    as.data.frame() %>%
+    arrange(desc(Freq))
+
+  # Rename columns to a standard format
+  colnames(sample_bcrhdj) <- c("AdjustedID", "VDJ", "Freq")
+
+  # Calculate total frequencies grouped by ID
+  total_freq_by_id <- sample_bcrhdj %>%
+    group_by(AdjustedID) %>%
+    summarise(total_freq = sum(Freq)) %>%
+    ungroup()  # Ensure that the data frame is no longer grouped
+
+  # Join the total frequencies back to the original data
+  sample_bcrhdj <- left_join(sample_bcrhdj, total_freq_by_id, by = "AdjustedID")
+
+  return(sample_bcrhdj)
+}
+
+NewBCR$BCRHDJ<-paste0(NewBCR$Clean_IGHD,"_",NewBCR$Clean_IGHJ)
+IGHDJresult_df <- create_sample_bcrhdj(NewBCR, "AdjustedID", "BCRHDJ", "B")
+print(IGHDJresult_df )
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+calculate_correlations <- function(df, id_col, freq_col, total_freq_col, group_col) {
+  # Extracting the week information from the ID column
+  df$Week <- as.numeric(substring(df[[id_col]], 2, 5))
+  
+  # Calculating the percentage
+  df$Per <- df[[freq_col]] / df[[total_freq_col]]
+  
+  # Performing correlation tests grouped by the specified column
+  cor_results <- df %>%
+    group_by_at(vars(one_of(group_col))) %>%
+    summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+              p.value = cor.test(Week, Per, method = "spearman")$p.value) %>%
+    ungroup() %>%
+    mutate(p.adjusted = p.adjust(p.value, method = "BH")) %>%
+    arrange(cor)
+  
+  # Filtering the data based on the adjusted p-value
+  significant_results <- cor_results %>%
+    filter(p.adjusted < 0.1) %>%
+    arrange(cor)
+  
+  # Adding a column to indicate the direction of the correlation
+  cor_results$VDJcor <- ifelse(cor_results$p.adjusted > 0.05, "NA",
+                                ifelse(cor_results$cor > 0, "+", "-"))
+  
+  # Return the results
+  list(cor_results = cor_results, significant_results = significant_results)
+}
+
+# To use the function, you'd call it with the appropriate column names for your dataframe:
+IGHDJresult_dfcor<- calculate_correlations(IGHDJresult_df, "AdjustedID", "Freq", "total_freq", "VDJ")
+print(IGHDJresult_dfcor$cor_results)
+print(IGHDJresult_dfcor$significant_results)
+```
+```{r}
+library(dplyr)
+library(tidyr)
+
+process_cor_results <- function(cor_results_df, cor_col, group_col) {
+  # Assign size factors based on the absolute value of the correlation
+  cor_results_df$size_factor <- cut(
+    abs(cor_results_df[[cor_col]]),
+    breaks = c(-Inf, 0.5, 0.6, 0.7, 0.8, Inf),
+    labels = c("0-0.5", "0.5-0.6", "0.6-0.7", "0.7-0.8", "0.8-1.0")
+  )
+
+  # Create a copy of the VDJ column for later use
+  cor_results_df <- cor_results_df %>%
+    mutate(VDJ2 = .data[[group_col]]) %>%
+    separate(.data[[group_col]], into = c("Dgene", "Jgene"), sep = "_") %>%
+    mutate(VDJ = VDJ2) %>%
+    mutate(VDJ2 = paste0(Jgene, "_", Dgene))
+
+  # Filter out rows with "NA" in the correlation significance column
+  filtered_cor_results <- subset(cor_results_df, VDJcor != "NA")
+
+  # Remove duplicates based on the VDJ2 column
+  unique_cor_results <- filtered_cor_results[!duplicated(filtered_cor_results$VDJ2),]
+
+  return(unique_cor_results)
+}
+
+SIGHDJresult_dfcorsig<- process_cor_results(IGHDJresult_dfcor$cor_results, "cor", "VDJ")
+# print(final_results)
+```
+
+```{r}
+P1DJ=ggplot() +
+  geom_tile(data = IGHDJresult , aes(x = Dgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRH", x = "D gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))+  geom_text(data = SIGHDJresult_dfcorsig, 
+            aes(x = Dgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4,"0.5-0.6"=5,  "0.6-0.7" = 6, "0.7-0.8"= 7,"0.8-0.9"= 8,"0.8-1.0"=9))
+P1DJ
+```
+```{r}
+ggsave(plot = P1DJ,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure5/Figure5H_BCRH_all_DJcombined.pdf",width = 8,height = 4)
+ggsave(plot = P1DJ,"Output/Plot/Figure5H_BCRH_all_DJcombined.pdf",width = 8,height = 4)
+```
+
+```{r}
+subVDJ$BCRHDJ<-paste0(subVDJ$IR_D,"_",subVDJ$IR_VDJ_1_j_call)
+subD_data =subVDJ[grep("B", subVDJ[["AdjustedID"]]),]
+BCRHDJ = table(subD_data$BCRHDJ) %>% as.data.frame() %>% arrange(desc(Freq))
+BCRHDJ$Per = BCRHDJ$Freq / sum(BCRHDJ$Freq)*100
+
+separated_dataD <- BCRHDJ %>%
+  separate(Var1, into = c("Dgene", "Jgene"), sep = "_")
+
+Dwide_data <- separated_dataD %>% select(-Freq) %>%
+  spread(key = Dgene, value = Per)
+
+rownames(Dwide_data) <- Dwide_data$Jgene
+Dwide_data <- Dwide_data[, -1]
+Dwide_data[is.na(Dwide_data)] <- 0
+missing_cols <- setdiff(IGHDIMGT$IGH[-27], colnames(Dwide_data))
+
+  for(col in missing_cols) {
+    Dwide_data[[col]] <- 0
+  }
+
+  Dwide_data <- Dwide_data[,IGHDIMGT$IGH[-27]]
+BCRHDFreq_exp=rownames_to_column(Dwide_data)
+BCRHDJlongexp <- melt(BCRHDFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+
+colnames(BCRHDJlongexp)<-c("Jgene","Dgene","Per")
+BCRHDJlongexp$Sample=paste0(BCRHDJlongexp$Dgene,"_",BCRHDJlongexp$Jgene)
+```
+
+
+
+
+
+```{r}
+subBCRHh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+Sample_BCRHDJ=table(subBCRHh1$AdjustedID,subBCRHh1$BCRHDJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_BCRHDJ)<-c("AdjustedID","VDJ","Freq")
+
+DJtotal_freq_by_id <- Sample_BCRHDJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_BCRHDJ <- left_join(Sample_BCRHDJ, DJtotal_freq_by_id, by = "AdjustedID")
+```
+
+```{r}
+Sample_BCRHDJ$Week<-substring(Sample_BCRHDJ$AdjustedID,2,5) %>% as.numeric()
+Sample_BCRHDJ$Per=Sample_BCRHDJ$Freq/Sample_BCRHDJ$total_freq
+Sample_BCRHDJ_cor_results <- Sample_BCRHDJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+Sample_BCRHDJ_cor_results<-Sample_BCRHDJ_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(Sample_BCRHDJ_cor_results)
+subset(Sample_BCRHDJ_cor_results,p.adjusted<0.1) %>% arrange(cor)
+Sample_BCRHDJ_cor_results$VDJcor<-ifelse(Sample_BCRHDJ_cor_results$p.adjusted>0.1,"NA",ifelse(Sample_BCRHDJ_cor_results$cor>0,"+","-"))
+```
+
+
+
+```{r}
+ Sample_BCRHVJ 
+```
+
+```{r}
+Sample_BCRHDJ_cor_results
+```
+
+
+```{r}
+# 
+#   return(wide_data)
+# }
+
+Sample_BCRHDJ_cor_results$size_factor <- cut(abs(Sample_BCRHDJ_cor_results$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+Sample_BCRHDJ_cor_results=Sample_BCRHDJ_cor_results%>%mutate(VDJ2=VDJ) %>% 
+  separate(VDJ, into = c("Dgene", "Jgene"), sep = "_")%>%mutate(VDJ=VDJ2) %>% 
+mutate(VDJ2=paste0(Jgene,"_",Dgene))
+Sample_BCRHDJ_cor_results2<-subset(Sample_BCRHDJ_cor_results,VDJcor!="NA")
+Sample_BCRHDJ_cor_results2<-Sample_BCRHDJ_cor_results2[!duplicated(Sample_BCRHDJ_cor_results2$VDJ2),]
+```
+
+
+```{r}
+ggplot() +
+  geom_tile(data = BCRHDJlongexp, aes(x = Dgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRH", x = "D gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))+  geom_text(data = Sample_BCRHDJ_cor_results2, 
+            aes(x = Dgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4,"0.5-0.6"=5,  "0.6-0.7" = 6, "0.7-0.8"= 7,"0.8-0.9"= 8,"0.8-1.0"=9))
+
+
+```
+
+#----------------
+
+####  BCRHlongexp
+```{r}
+BCRHFreq_exp=VDJfun(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+
+
+BCRHFreq_exp=rownames_to_column(BCRHFreq_exp)
+BCRHlongexp <- melt(BCRHFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+colnames(BCRHlongexp)<-c("Jgene","Vgene","Per")
+BCRHlongexp$Sample=paste0(BCRHlongexp$Vgene,"_",BCRHlongexp$Jgene)
+BCRHlongexp$VDJsig<-BCRHlongexp$Sample %in% as.character(top_VDJ)
+
+BCRHlongexp$VDJsig <- ifelse(BCRHlongexp$VDJsig, BCRHlongexp$Sample, "Others")
+```
+
+
+
+```{r}
+library(ggplot2)
+
+
+PBMCBCRH_cor_results2$size_factor <- cut(abs(PBMCBCRH_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+BCRHp1 <- ggplot() +
+  geom_tile(data = BCRHlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRH", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCBCRH_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(BCRHp1)
+
+ggsave(plot = BCRHp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure5/Figure5H_BCRH_all_VJcombined.pdf",width = 8,height = 4)
+```
+
+
+
+#### PBMCBCRH_cor_results
+```{r}
+dim(PBMCBCRH_cor_results)
+PBMCBCRH_cor_results=PBMCBCRH_cor_results %>% separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")
+PBMCBCRH_cor_results2=subset(PBMCBCRH_cor_results,p.value<0.05&abs(cor)>0.6)
+dim(BCRHlongexp)
+# setdiff(BCRHlongexp$Sample,PBMCBCRH_cor_results$VDJ)
+```
+
+
+#### Plot:cor percentage heatmmap 
+```{r}
+# BCRHlongexp$Jgene<-factor(BCRHlongexp$Jgene,levels = rev($IMGT_gene_name))
+```
+```{r}
+PBMCBCRH_cor_results2
+```
+
+
+```{r}
+library(ggplot2)
+
+
+PBMCBCRH_cor_results2$size_factor <- cut(abs(PBMCBCRH_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+BCRHp1 <- ggplot() +
+  geom_tile(data = BCRHlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRH", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCBCRH_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(BCRHp1)
+
+ggsave(plot = BCRHp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure5/Figure5H_BCRH_all_VJcombined.pdf",width = 8,height = 4)
+```
+```{r}
+
+```
+
+
+#### Plot:test ggplot cluster 
+```{r}
+# library(reshape2)
+# mat_data <- dcast(long_data, Vgene ~ Jgene, value.var = "Per")
+# rownames(mat_data) <- mat_data$Vgene
+# mat_data <- mat_data[, -1]
+# mat_data <- as.matrix(mat_data)
+# clusters_row <- hclust(dist(mat_data), method = "ave")
+# clusters_col <- hclust(dist(t(mat_data)), method = "ave")
+# long_data_clustered <- melt(mat_data)
+# colnames(long_data_clustered) <- c("Vgene", "Jgene", "Per")
+```
+
+
+
+```{r}
+# long_data_clustered$Vgene<-as.character(long_data_clustered$Vgene)
+# long_data_clustered$Jgene<-as.character(long_data_clustered$Jgene)
+```
+
+
+
+```{r}
+# P1 <- ggplot(long_data_clustered, aes(x =Jgene, y =  Vgene, fill = Per)) +
+#   geom_tile(color = "white") +
+#   scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+#                        na.value = "white") +
+#   theme_minimal() +
+#   labs(title = "BCRH", x = "V gene", y = "J gene") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1),
+#         plot.title = element_text(hjust = 0.5)) +
+#   scale_x_dendrogram(labels = T, hclust = clusters_col) +
+#   scale_y_dendrogram(labels = T, hclust = clusters_row) 
+# 
+# print(P1)
+```
+
+
+```{r}
+# ggplot()+geom_tile(data=PBMCBCRHVJ_separated,aes(Vgene,Jgene,fill=0),color="gray52",fill="white",size=1)+geom_tile(data=PBMCBCRHVJ_separated ,aes(Vgene,Jgene,value=Per,fill=Per))+ theme(axis.text.x=element_text(angle=90, hjust=1)) + scale_fill_gradientn(colours =rev(colorRampPalette(c('#C6403D', 'white','#246BAE'))(111)))+theme(axis.text.y=element_text(size = 12,color=c(rep("#246BAE",4),rep("#D0AB39",4),rep("#3FBDA7",4),rep("#C6403D",4))))+
+#   guides(fill=guide_colorbar(barheight = 28))+theme_bw()+
+#   theme(panel.grid = element_blank(),
+#         panel.border = element_blank(),
+#         axis.text.x = element_text(angle = 60,
+#                                    hjust=1,vjust = 1))
+```
+
+#----Per Sample BCRK----
+
+### Get Sample percentage
+
+```{r}
+subVDJ$BCRKVJ<-paste0(subVDJ$IR_VJ_1_v_call,"_",subVDJ$IR_VJ_1_j_call)
+```
+
+```{r}
+subVDJ[grep("B",subVDJ$AdjustedID),] %>% .[grep("IGKV",.$BCRKVJ),]
+```
+
+```{r}
+subBCRKh1=subVDJ[grep("B",subVDJ$AdjustedID),] %>% .[grep("IGKV",.$BCRKVJ),]
+Sample_BCRKVJ=table(subBCRKh1$AdjustedID,subBCRKh1$BCRKVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_BCRKVJ)<-c("AdjustedID","VDJ","Freq")
+
+BCRKVJ_total_freq_by_id <- Sample_BCRKVJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_BCRKVJ <- left_join(Sample_BCRKVJ, BCRKVJ_total_freq_by_id, by = "AdjustedID")
+
+
+Sample_BCRKVJ <- Sample_BCRKVJ %>% 
+  mutate(Per = Freq / total_freq*100)
+
+Sample_BCRKVJ <- Sample_BCRKVJ %>% arrange(AdjustedID)
+Sample_BCRKVJ$Week=substring(Sample_BCRKVJ$AdjustedID,2,5) %>% as.numeric()
+length(unique(Sample_BCRKVJ$VDJ))
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+Sample_BCRKVJ$Week <- as.numeric(Sample_BCRKVJ$Week)
+Sample_BCRKVJ$Per <- as.numeric(Sample_BCRKVJ$Per)
+
+
+topA_VDJ <- Sample_BCRKVJ %>% 
+  group_by(VDJ) %>%
+  summarise(Total_Per = sum(Per)) %>%
+  top_n(10, Total_Per) %>%
+  pull(VDJ)
+
+Sample_BCRKVJ <- Sample_BCRKVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% topA_VDJ, VDJ, "Other"))
+Sample_BCRKVJ$VDJ_Top10<-factor(Sample_BCRKVJ$VDJ_Top10,levels = c(as.character(topA_VDJ),"Other"))
+```
+
+```{r}
+ggplot(Sample_BCRKVJ, aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  geom_line() +
+  scale_color_manual(values = c(rainbow(10), "gray")) +
+  labs(x = "Week", y = "Per", color = "VDJ") +
+  theme_classic()
+```
+#### corBCRK
+```{r}
+PBMCBCRK_cor_results <- Sample_BCRKVJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+PBMCBCRK_cor_results<-PBMCBCRK_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(PBMCBCRK_cor_results)
+subset(PBMCBCRK_cor_results,p.value<0.05) %>% arrange(cor)
+PBMCBCRK_cor_results$VDJcor<-ifelse(PBMCBCRK_cor_results$p.value>0.05,"NA",ifelse(PBMCBCRK_cor_results$cor>0,"+","-"))
+```
+
+### BCRKfunction Data
+
+```{r}
+library(ggplot2)
+library(reshape2) # for melt function
+
+BCRKVDJfun <- function(data,pattern, BCRKinIMGT=BCRKIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRKVJ = table(sub_data$BCRKVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRKVJ$Per = BCRKVJ$Freq / sum(BCRKVJ$Freq)*100
+  
+  separated_data <- BCRKVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(BCRKinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  
+  wide_data <- wide_data[,BCRKinIMGT$IMGT_gene_name]
+  
+  return(wide_data)
+}
+```
+
+```{r}
+BCRKIMGTsub=IGKVIMGT[IGKVIMGT$IMGT.gene.name %in% subVDJ$IR_VJ_1_v_call,] %>% arrange(IMGT.gene.order)
+colnames(BCRKIMGTsub)<-c("IMGT_gene_name","IMGT.gene.order")
+```
+####  BCRKlongexp
+```{r}
+subKVDJ=subVDJ%>% .[grep("IGKV",.$BCRKVJ),]
+BCRKFreq_exp=BCRKVDJfun(data = subKVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+
+
+BCRKFreq_exp=rownames_to_column(BCRKFreq_exp)
+BCRKlongexp <- melt(BCRKFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+colnames(BCRKlongexp)<-c("Jgene","Vgene","Per")
+BCRKlongexp$Sample=paste0(BCRKlongexp$Vgene,"_",BCRKlongexp$Jgene)
+BCRKlongexp$VDJsig<-BCRKlongexp$Sample %in% as.character(top_VDJ)
+
+
+BCRKlongexp$VDJsig <- ifelse(BCRKlongexp$VDJsig, BCRKlongexp$Sample, "Others")
+```
+
+#### PBMCBCRK_cor_results
+```{r}
+dim(PBMCBCRK_cor_results)
+PBMCBCRK_cor_results=PBMCBCRK_cor_results %>% separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")
+PBMCBCRK_cor_results2=subset(PBMCBCRK_cor_results,p.value<0.05&abs(cor)>0.6)
+dim(BCRKlongexp)
+# setdiff(BCRKlongexp$Sample,PBMCBCRK_cor_results$VDJ)
+```
+```{r}
+IGKVIMGT$IMGT.gene.name
+```
+
+
+#### Plot:cor percentage heatmmap 
+```{r}
+BCRKlongexp$Jgene<-factor(BCRKlongexp$Jgene,levels = rev(IGKJIMGT$IMGT_gene_name))
+```
+```{r}
+PBMCBCRK_cor_results2
+```
+
+```{r}
+library(ggplot2)
+
+
+PBMCBCRK_cor_results2$size_factor <- cut(abs(PBMCBCRK_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+BCRKp1 <- ggplot() +
+  geom_tile(data = BCRKlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRK", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCBCRK_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c( "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(BCRKp1)
+
+ggsave(plot = BCRKp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure5/Figure5H_BCRK_all_VJcombined.pdf",width = 8,height = 4)
+```
+
+```{r}
+BCRKVDJheatmap <- function(data,pattern, BCRKinIMGT=BCRKIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRKVJ = table(sub_data$BCRKVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRKVJ$Per = BCRKVJ$Freq / sum(BCRKVJ$Freq)*100
+  
+  separated_data <- BCRKVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(BCRKinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  wide_data<-wide_data[,BCRKinIMGT$IMGT_gene_name]
+  pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  return(wide_data)
+}
+```
+
+```{r}
+BCRKVDJheatmap(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+```
+
+# ----BCRH----
+
+```{r}
+
+subBCRHvdj=subBCRHobs2[, c("AdjustedID", "New_Body", colnames(subBCRHobs2)[grep("VDJ", colnames(subBCRHobs2))])]
+subBCRHvdj$BCRHvj=paste0(subBCRHvdj$IR_VDJ_1_v_call,"_",subBCRHvdj$IR_VDJ_1_j_call)
+subBCRHvdj$aalength=nchar(subBCRHvdj$IR_VDJ_1_junction_aa)
+subBCRHvdjlen=table(subBCRHvdj$BCRHvj,subBCRHvdj$aalength) %>% as.data.frame()
+```
+
+```{r}
+# subset(subBCRHvdjlen,Len==17&Freq>median((subset(subBCRHvdjlen,Len==17&Freq>0)$Freq)))
+# max(subset(subBCRHvdjlen,Len==17&Freq>0)$Freq)
+```
+```{r}
+PBMCBCRH_cor_results2$VJgene=paste0(PBMCBCRH_cor_results2$Vgene,"_",PBMCBCRH_cor_results2$Jgene)
+# intersect(PBMCBCRH_cor_results2$VJgene,subset(subBCRHvdjlen,Len==17&Freq>median((subset(subBCRHvdjlen,Len==17&Freq>0)$Freq)))$VDJ)
+```
+
+
+```{r}
+colnames(subBCRHvdjlen)<-c("VDJ","Len","Freq")
+subBCRHvdjlen$Percentage=subBCRHvdjlen$Freq/sum(subBCRHvdjlen$Freq)*100
+
+P2=ggplot(subBCRHvdjlen)+geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRH", x = "V gene", y = "J gene",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+P2
+```
+
+```{r}
+subBCRHvdjlen_JV=subBCRHvdjlen%>%mutate(VDJ2=VDJ) %>% 
+  separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")%>%mutate(VDJ=VDJ2) %>% 
+mutate(VDJ2=paste0(Jgene,"_",Vgene)) 
+
+subBCRHvdjlen_JV[subBCRHvdjlen_JV$Jgene %in% c("IGHJ6","IGHJ3","IGHJ4"),] %>% 
+ggplot()+geom_tile(aes(Len,VDJ2,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRH", x = "CDR3 length", y = "J-V pair",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) ->PBCH_len_J
+PBCH_len_J
+ggsave(plot = PBCH_len_J,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/S30_BCRH_IGVJcombined.pdf",height = 14,width = 8)
+```
+```{r}
+#ggsave(plot=PBCH_len_J,"Figure/PBCH_len_J.pdf",width = 6,height = 15)
+```
+
+
+
+```{r}
+subBCRHvdjlen[grep("IGHJ6|IGHJ4",subBCRHvdjlen$VDJ),]
+```
+
+```{r}
+subBCRHvdjlen[grep("IGHJ6",subBCRHvdjlen$VDJ),] %>%
+  ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRH", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+
+```
+
+```{r}
+
+subBCRHvdjlen[subBCRHvdjlen$VDJ %in% intersect(PBMCBCRH_cor_results2$VJgene,subset(subBCRHvdjlen,Len==17&Freq>median((subset(subBCRHvdjlen,Len==17&Freq>0)$Freq)))$VDJ),] %>%
+  ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRH", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# subBCRHvdjlen=table(subBCRHvdj$BCRHvj,subBCRHvdj$aalength) %>% as.data.frame()
+```
+
+
+```{r}
+PBMCBCRH_cor_results2$VDJgene=paste0(PBMCBCRH_cor_results2$Vgene,"_",PBMCBCRH_cor_results2$Jgene)
+BCRHlongexpsig=merge(BCRHlongexp,PBMCBCRH_cor_results2,by.x="Sample",by.y="VDJgene")
+subset(BCRHlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10)
+# max_five <- sort(BCRHlongexp$Per, decreasing = TRUE) %>% head( 10)
+
+subset(BCRHlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subset(BCRHlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subBCRHsortgene=subset(BCRHlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+subBCRHvdjlen[subBCRHvdjlen$VDJ %in%subBCRHsortgene ,] %>% mutate(VDJ=factor(VDJ,levels=rev(subBCRHsortgene)))%>%
+  ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                                                                                        na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRH", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# subBCRHvdjlenmax
+```
+
+### Plot:BCRH All len
+```{r}
+subBCRHvdjlenmax <- subBCRHvdjlen %>%
+  group_by(VDJ) %>%
+  mutate(Percentage_max = max(Percentage)) %>%
+  filter(Percentage == Percentage_max)
+m1=merge(subBCRHvdjlenmax,BCRHlongexpsig,by.x="VDJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VDJ %in% subBCRHsortgene,subBCRHsortgene,"Others")) 
+m1<-m1[!duplicated(m1$VDJ),]
+length(unique(m1$VDJ))
+m1$VDJcol <- subBCRHsortgene[match(m1$VDJ, subBCRHsortgene)]
+m1$VDJcol[is.na(m1$VDJcol)] <- "Others BCRH V-J"
+table(m1$VDJcol)
+setdiff( subBCRHsortgene,m1$VDJ )
+
+library(ggsci)
+
+P3BCRHplot=m1%>% mutate(Rcor=ifelse(cor<0,"R<0","R>0")) %>% mutate(VDJcol=factor(VDJcol,levels=c(subBCRHsortgene,"Others BCRH V-J"))) %>% 
+  ggplot() +
+  geom_point(aes(Len,cor,size=Per,color=VDJcol,shape=Rcor)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC BCRH", x = "BCRH V-J CDR3 max len", y = " Percentage in All(%)",size="Percentage in BCRH V-J(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),aspect.ratio = 0.6)+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))+scale_color_futurama()
+P3BCRHplot
+```
+```{r}
+# #ggsave(plot=P3BCRHplot,"Figure/P3BCRHplot.pdf",width = 8,height = 6)
+```
+### Plot:BCRH All len
+```{r}
+merge(subBCRHvdjlen,BCRHlongexpsig,by.x="VDJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VDJ %in% subBCRHsortgene,subBCRHsortgene,"Others")) %>% mutate(Percentage2=ifelse(cor <0,-Percentage,Percentage)) %>% 
+  ggplot() +
+  geom_point(aes(Len,Percentage2,color=VDJcol)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC BCRH", x = "VDJ CDR3 max len", y = "Percentage(%)",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))
+```
+
+
+#----BCRK----
+```{r}
+subBCRKvdj=subBCRHobs2[, c("AdjustedID", "New_Body", colnames(subBCRHobs2)[grep("VJ", colnames(subBCRHobs2))])]
+subBCRKvdj$BCRKvj=paste0(subBCRKvdj$IR_VJ_1_v_call,"_",subBCRKvdj$IR_VJ_1_j_call)
+subBCRKvdj$aalength=nchar(subBCRKvdj$IR_VJ_1_junction_aa)
+subBCRKvdjlen=table(subBCRKvdj$BCRKvj,subBCRKvdj$aalength) %>% as.data.frame()
+max(subBCRKvdjlen$Percentage)
+colnames(subBCRKvdjlen)<-c("VJ","Len","Freq")
+subBCRKvdjlen$Percentage=subBCRKvdjlen$Freq/sum(subBCRKvdjlen$Freq)*100
+```
+### Plot:BCRK All len
+```{r}
+subBCRKvdjlen_JV=subBCRKvdjlen%>%mutate(VJ2=VJ) %>% 
+  separate(VJ, into = c("Vgene", "Jgene"), sep = "_")%>%mutate(VJ=VJ2) %>% 
+  mutate(VJ2=paste0(Jgene,"_",Vgene)) 
+PlenBCRK=ggplot(subBCRKvdjlen_JV)+geom_tile(aes(Len,VJ2,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619", '#246BAE')), 
+                                                                                                     na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRK", x = "CDR3 Length", y = "J gene",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        )
+PlenBCRK
+```
+
+```{r}
+#ggsave(plot=PlenBCRK,"Figure/PlenBCRK.pdf",width = 6,height = 24)
+```
+
+```{r}
+# #ggsave(plot=PlenBCRK,"Figure/PlenBCRK.pdf")
+```
+
+```{r}
+PBMCBCRK_cor_results2$VJgene[1:10]
+```
+```{r}
+PBMCBCRK_cor_results2$VJgene=paste0(PBMCBCRK_cor_results2$Vgene,"_",PBMCBCRK_cor_results2$Jgene)
+BCRKlongexpsig=merge(BCRKlongexp,PBMCBCRK_cor_results2,by.x="Sample",by.y="VJgene")
+subset(BCRKlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10)
+# max_five <- sort(BCRKlongexp$Per, decreasing = TRUE) %>% head( 10)
+
+subset(BCRKlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subset(BCRKlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+### Plot:BCRK ten len
+```{r}
+subBCRKsortgene=subset(BCRKlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+subBCRKvdjlen[subBCRKvdjlen$VJ %in%subBCRKsortgene ,] %>% mutate(VJ=factor(VJ,levels=rev(subBCRKsortgene)))%>%
+  ggplot() +geom_tile(aes(Len,VJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                                                                                         na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRK", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+subBCRKvdjlen
+```
+
+```{r}
+subBCRKvdjlenmax <- subBCRKvdjlen %>%
+  group_by(VJ) %>%
+  mutate(Percentage_max = max(Percentage)) %>%
+  filter(Percentage == Percentage_max)
+m1=merge(subBCRKvdjlenmax,BCRKlongexpsig,by.x="VJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VJ %in% subBCRKsortgene,subBCRKsortgene,"Others")) 
+m1<-m1[!duplicated(m1$VJ),]
+length(unique(m1$VJ))
+m1$VDJcol <- subBCRKsortgene[match(m1$VJ, subBCRKsortgene)]
+m1$VDJcol[is.na(m1$VDJcol)] <- "Others BCRK V-J"
+table(m1$VDJcol)
+setdiff( subBCRKsortgene,m1$VJ )
+
+library(ggsci)
+
+P3BCRKplot=m1%>% mutate(Rcor=ifelse(cor<0,"R<0","R>0")) %>% mutate(VDJcol=factor(VDJcol,levels=c(subBCRKsortgene,"Others BCRK V-J"))) %>% 
+  ggplot() +
+  geom_point(aes(Len,cor,size=Per,color=VDJcol,shape=Rcor)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC BCRK", x = "BCRK V-J CDR3 max len", y = " Percentage in All BCRK V-J(%)",size="Percentage in BCRK V-J(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),aspect.ratio = 0.6)+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))+scale_color_futurama()
+P3BCRKplot
+```
+
+```{r}
+#ggsave(plot=P3BCRKplot,"Figure/P3BCRKplot.pdf")
+```
+
+#----BCRL----
+
+### Get Sample percentage
+
+```{r}
+subVDJ$BCRLVJ<-paste0(subVDJ$IR_VJ_1_v_call,"_",subVDJ$IR_VJ_1_j_call)
+```
+
+```{r}
+subVDJ[grep("B",subVDJ$AdjustedID),] %>% .[grep("IGLV",.$BCRLVJ),]
+```
+
+```{r}
+subBCRLh1=subVDJ[grep("B",subVDJ$AdjustedID),] %>% .[grep("IGLV",.$BCRLVJ),]
+Sample_BCRLVJ=table(subBCRLh1$AdjustedID,subBCRLh1$BCRLVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_BCRLVJ)<-c("AdjustedID","VDJ","Freq")
+
+BCRLVJ_total_freq_by_id <- Sample_BCRLVJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_BCRLVJ <- left_join(Sample_BCRLVJ, BCRLVJ_total_freq_by_id, by = "AdjustedID")
+
+
+Sample_BCRLVJ <- Sample_BCRLVJ %>% 
+  mutate(Per = Freq / total_freq*100)
+
+Sample_BCRLVJ <- Sample_BCRLVJ %>% arrange(AdjustedID)
+Sample_BCRLVJ$Week=substring(Sample_BCRLVJ$AdjustedID,2,5) %>% as.numeric()
+length(unique(Sample_BCRLVJ$VDJ))
+unique(Sample_BCRLVJ$AdjustedID)
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+Sample_BCRLVJ$Week <- as.numeric(Sample_BCRLVJ$Week)
+Sample_BCRLVJ$Per <- as.numeric(Sample_BCRLVJ$Per)
+
+
+topA_VDJ <- Sample_BCRLVJ %>% 
+  group_by(VDJ) %>%
+  summarise(Total_Per = sum(Per)) %>%
+  top_n(10, Total_Per) %>%
+  pull(VDJ)
+
+Sample_BCRLVJ <- Sample_BCRLVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% topA_VDJ, VDJ, "Other"))
+Sample_BCRLVJ$VDJ_Top10<-factor(Sample_BCRLVJ$VDJ_Top10,levels = c(as.character(topA_VDJ),"Other"))
+```
+
+```{r}
+ggplot(Sample_BCRLVJ, aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  geom_line() +
+  scale_color_manual(values = c(rainbow(10), "gray")) +
+  labs(x = "Week", y = "Per", color = "VDJ") +
+  theme_classic()
+```
+
+#### corBCRL
+```{r}
+PBMCBCRL_cor_results <- Sample_BCRLVJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+PBMCBCRL_cor_results<-PBMCBCRL_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(PBMCBCRL_cor_results)
+subset(PBMCBCRL_cor_results,p.value<0.05) %>% arrange(cor)
+PBMCBCRL_cor_results$VDJcor<-ifelse(PBMCBCRL_cor_results$p.value>0.05,"NA",ifelse(PBMCBCRL_cor_results$cor>0,"+","-"))
+```
+### BCRLfunction Data
+
+```{r}
+library(ggplot2)
+library(reshape2) # for melt function
+
+BCRLVDJfun <- function(data,pattern, BCRLinIMGT=BCRLIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRLVJ = table(sub_data$BCRLVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRLVJ$Per = BCRLVJ$Freq / sum(BCRLVJ$Freq)*100
+  
+  separated_data <- BCRLVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(BCRLinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  
+  wide_data <- wide_data[,BCRLinIMGT$IMGT_gene_name]
+  
+  return(wide_data)
+}
+```
+
+```{r}
+BCRLIMGTsub=IGLVIMGT[IGLVIMGT$IMGT.gene.name %in% subVDJ$IR_VJ_1_v_call,] %>% arrange(IMGT.gene.order)
+colnames(BCRLIMGTsub)<-c("IMGT_gene_name","IMGT.gene.order")
+```
+####  BCRLlongexp
+```{r}
+subLVDJ=subVDJ%>% .[grep("IGLV",.$BCRLVJ),]
+BCRLFreq_exp=BCRLVDJfun(data = subLVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+
+
+BCRLFreq_exp=rownames_to_column(BCRLFreq_exp)
+BCRLlongexp <- melt(BCRLFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+colnames(BCRLlongexp)<-c("Jgene","Vgene","Per")
+BCRLlongexp$Sample=paste0(BCRLlongexp$Vgene,"_",BCRLlongexp$Jgene)
+BCRLlongexp$VDJsig<-BCRLlongexp$Sample %in% as.character(top_VDJ)
+
+
+BCRLlongexp$VDJsig <- ifelse(BCRLlongexp$VDJsig, BCRLlongexp$Sample, "Others")
+```
+
+#### PBMCBCRL_cor_results
+```{r}
+dim(PBMCBCRL_cor_results)
+PBMCBCRL_cor_results=PBMCBCRL_cor_results %>% separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")
+PBMCBCRL_cor_results2=subset(PBMCBCRL_cor_results,p.value<0.05&abs(cor)>0.6)
+dim(BCRLlongexp)
+# setdiff(BCRLlongexp$Sample,PBMCBCRL_cor_results$VDJ)
+```
+#### Plot:cor percentage heatmmap 
+```{r}
+BCRLlongexp$Jgene<-factor(BCRLlongexp$Jgene,levels = rev(IGLJIMGT$IMGT.gene.name))
+```
+
+
+```{r}
+library(ggplot2)
+
+
+PBMCBCRL_cor_results2$size_factor <- cut(abs(PBMCBCRL_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+BCRLp1 <- ggplot() +
+  geom_tile(data = BCRLlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All BCRL", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCBCRL_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(BCRLp1)
+
+ggsave(plot = BCRLp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure5/Figure5H_BCRL_all_VJcombined.pdf",width = 8,height = 4)
+```
+
+
+```{r}
+BCRLVDJheatmap <- function(data,pattern, BCRLinIMGT=BCRLIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  BCRLVJ = table(sub_data$BCRLVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  BCRLVJ$Per = BCRLVJ$Freq / sum(BCRLVJ$Freq)*100
+  
+  separated_data <- BCRLVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(BCRLinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  wide_data<-wide_data[,BCRLinIMGT$IMGT_gene_name]
+  pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  return(wide_data)
+}
+```
+
+```{r}
+BCRLVDJheatmap(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+```
+
+
+#----BCRL----
+```{r}
+subBCRLvdj=subBCRHobs2[, c("AdjustedID", "New_Body", colnames(subBCRHobs2)[grep("VJ", colnames(subBCRHobs2))])]
+subBCRLvdj$BCRLvj=paste0(subBCRLvdj$IR_VJ_1_v_call,"_",subBCRLvdj$IR_VJ_1_j_call)
+subBCRLvdj$aalength=nchar(subBCRLvdj$IR_VJ_1_junction_aa)
+subBCRLvdj=subBCRLvdj[grep("B",subBCRLvdj$AdjustedID),]
+unique(subBCRLvdj$AdjustedID)
+subBCRLvdj=subBCRLvdj[grep("IGLV",subBCRLvdj$BCRLvj),]
+subBCRLvdjlen=table(subBCRLvdj$BCRLvj,subBCRLvdj$aalength) %>% as.data.frame()
+# max(subBCRLvdjlen$Percentage)
+colnames(subBCRLvdjlen)<-c("VJ","Len","Freq")
+subBCRLvdjlen$Percentage=subBCRLvdjlen$Freq/sum(subBCRLvdjlen$Freq)*100
+```
+
+### Plot:BCRL All len
+```{r}
+subBCRLvdjlen
+PlenBCRL=ggplot(subBCRLvdjlen)+geom_tile(aes(Len,VJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619", '#246BAE')), 
+                                                                                                           na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRL", x = "CDR3 Length", y = "J gene",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_blank())
+PlenBCRL
+```
+```{r}
+PBMCBCRL_cor_results2$VJgene=paste0(PBMCBCRL_cor_results2$Vgene,"_",PBMCBCRL_cor_results2$Jgene)
+BCRLlongexpsig=merge(BCRLlongexp,PBMCBCRL_cor_results2,by.x="Sample",by.y="VJgene")
+subset(BCRLlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10)
+# max_five <- sort(BCRLlongexp$Per, decreasing = TRUE) %>% head( 10)
+
+subset(BCRLlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+### Plot:BCRL ten len
+```{r}
+subBCRLsortgene=subset(BCRLlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+subBCRLvdjlen[subBCRLvdjlen$VJ %in%subBCRLsortgene ,] %>% mutate(VJ=factor(VJ,levels=rev(subBCRLsortgene)))%>%
+  ggplot() +geom_tile(aes(Len,VJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                                                                                        na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC BCRL", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+subBCRLvdjlenmax <- subBCRLvdjlen %>%
+  group_by(VJ) %>%
+  mutate(Percentage_max = max(Percentage)) %>%
+  filter(Percentage == Percentage_max)
+m1=merge(subBCRLvdjlenmax,BCRLlongexpsig,by.x="VJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VJ %in% subBCRLsortgene,subBCRLsortgene,"Others")) 
+m1<-m1[!duplicated(m1$VJ),]
+length(unique(m1$VJ))
+m1$VDJcol <- subBCRLsortgene[match(m1$VJ, subBCRLsortgene)]
+m1$VDJcol[is.na(m1$VDJcol)] <- "Others BCRL V-J"
+table(m1$VDJcol)
+setdiff( subBCRLsortgene,m1$VJ )
+
+library(ggsci)
+
+P3BCRLplot=m1%>% mutate(Rcor=ifelse(cor<0,"R<0","R>0")) %>% mutate(VDJcol=factor(VDJcol,levels=c(subBCRLsortgene,"Others BCRL V-J"))) %>% 
+  ggplot() +
+  geom_point(aes(Len,cor,size=Per,color=VDJcol,shape=Rcor)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC BCRL", x = "BCRL V-J CDR3 max len", y = " Rcor",size="Percentage in BCRL V-J(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),aspect.ratio = 0.6)+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))+scale_color_futurama()
+P3BCRLplot
+```
+
+
+#---- Save and load data----
+
+```{r}
+# rm(list = ls())
+### 2023-10-28 23:30:58
+# load("/data1/maolp/Codeman/Project/Main_Gao_ScanpyProject20231003/Gao_plot/Figure3_TCRBCR_CDR3/DATA/BCR_MainBCR2_20231028.RData")
+```

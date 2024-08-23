@@ -1,0 +1,355 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-12-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+```{r}
+# table(PBMC_BCRH_chainlong2$variable)
+```
+
+
+```{r}
+BCRHJ6<-subset(BCRHJ,variable=="IGHJ6")
+write.csv(BCRHJ6,"IGHJ6.csv")
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readr)
+library(stringr)
+
+BCRsig <- function(file_path) {
+  df <- read_csv(file_path)
+  df$Week <- as.numeric(str_sub(df$Sample, 10, 13))
+  results <- df %>%
+    group_by(variable) %>%
+    summarize(correlation = cor.test(Week, value, method = "spearman")$estimate,
+              p.value = cor.test(Week, value, method = "spearman")$p.value,
+              .groups = 'drop')
+  significant_results <- filter(results,  p.value < 0.05)
+  file_name <- str_remove(basename(file_path), "_chainlong.csv")
+  significant_results <- mutate(significant_results, file_name = file_name)
+  return(significant_results)
+}
+
+folder_path <- "/home/maolp/Allcount/All_scanpyData/BCRTCRchain"
+file_paths <- list.files(path = folder_path, pattern = "^PBMC.*\\.csv$", full.names = TRUE)
+Bcombined<- map_df(file_paths, BCRsig)
+print(Bcombined)
+write.csv(Bcombined,"TCRBCRsig/BCRsig.csv")
+```
+```{r}
+BCRsig2 <- function(file_path) {
+  df <- read_csv(file_path)
+  df$Week <- as.numeric(str_sub(df$Sample, 10, 13))
+  results <- df %>%
+    group_by(variable) %>%
+    summarize(correlation = cor.test(Week, value, method = "spearman")$estimate,
+              p.value = cor.test(Week, value, method = "spearman")$p.value,
+              .groups = 'drop')
+
+  return(results)
+}
+```
+
+```{r}
+BCRsig2("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_IGKJJ_chainlong.csv" )
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readr)
+library(stringr)
+  calculate_correlation <- function(subset_df) {
+    subset_df %>%
+      group_by(variable) %>%
+      summarize(correlation = cor.test(Week, value, method = "spearman")$estimate,
+                p.value = cor.test(Week, value, method = "spearman")$p.value,
+                .groups = 'drop') %>%
+      filter( p.value < 0.05)
+  }
+TCRsig <- function(file_path) {
+  df <- read_csv(file_path)
+  
+  # Convert Week to numeric
+  df$Week <- as.numeric(str_sub(df$Sample, 14, 17))
+
+  # Function to calculate spearman correlation for a subset
+
+
+  # Split the data into CD4 and CD8
+  df_cd4 <- df[grep("CD4", df$Sample), ]
+  df_cd8 <- df[grep("CD8", df$Sample), ]
+
+  # Calculate correlations for CD4 and CD8
+  results_cd4 <- calculate_correlation(df_cd4)
+  results_cd8 <- calculate_correlation(df_cd8)
+
+  file_name <- str_remove(basename(file_path), ".csv")
+  results_cd4 <- mutate(results_cd4, file_name = file_name, type = "CD4")
+  results_cd8 <- mutate(results_cd8, file_name = file_name, type = "CD8")
+
+  results_combined <- bind_rows(results_cd4, results_cd8)
+  return(results_combined)
+}
+
+
+Tfolder_path <- "/home/maolp/Allcount/All_scanpyData/TCRchain/"
+Tfile_paths <- list.files(path = Tfolder_path, pattern = "^.*\\.csv$", full.names = TRUE)
+
+Tcombined <- map_df(Tfile_paths, TCRsig)
+print(Tcombined )
+write.csv(Tcombined ,"TCRBCRsig/TCRsig.csv")
+```
+
+
+
+
+
+```{r}
+# library(dplyr)
+# library(tidyr)
+# library(purrr)
+# library(readr)
+# library(stringr)
+# 
+# 
+# 
+# Tfolder_path <- "/home/maolp/Allcount/All_scanpyData/TCRchain/"
+# Tfile_paths <- list.files(path = Tfolder_path, pattern = "^.*\\.csv$", full.names = TRUE)
+# 
+# TCRsig <- function(file_path) {
+#   
+#   df <- read_csv(file_path)
+#  
+#   df$Week <- as.numeric(str_sub(df$Sample,  14, 17))
+#   results <- df %>%
+#     group_by(variable) %>%
+#     summarize(correlation = cor.test(Week, value, method = "spearman")$estimate,
+#               p.value = cor.test(Week, value, method = "spearman")$p.value,
+#               .groups = 'drop')
+#   significant_results <- filter(results,abs( correlation) >0.4 , p.value < 0.05)
+#   file_name <- str_remove(basename(file_path), "_chainlong.csv")
+#   significant_results <- mutate(significant_results, file_name = file_name)
+#   return(significant_results)
+# }
+# 
+# Tcombined <- map_df(Tfile_paths, TCRsig)
+# print(Tcombined )
+# write.csv(Tcombined ,"TCRBCRsig/TCRsigsum.csv")
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+T2A=read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain//CD48TCRA_chainlong.csv")
+T2A$CDtype<-ifelse(grepl("CD4",T2A$Sample),"CD4","CD8")
+T2A$SubTRV<-gsub("TR","",T2A$variable)
+TCRAVlist_values<-read.csv("TCRBCRchain200/TRAVlist_values.csv")
+T2A$SubTRV<-factor(T2A$SubTRV,levels = gsub("TR","",TCRAVlist_values$x))
+```
+
+
+```{r}
+
+T2A$variable<-factor(T2A$variable,levels = TCRAVlist_values$x)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+
+my_comparisons <- list(
+  c("CD4", "CD8")
+  
+)
+TCRACD4CD8<-T2A %>% 
+  ggplot(aes(CDtype,value,fill=CDtype))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(.~ SubTRV, scales = "free", space = 'free', switch = "y") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = '')+scale_fill_npg()
+TCRACD4CD8
+ggsave(plot=TCRACD4CD8,"TCRBCRsig/TCRAVCD4CD8.pdf",width = 40,height = 10)
+```
+
+```{r}
+T1h=read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain//TCRH_chainlong.csv")
+# T1h$CDtype<-ifelse(grepl("CD4",T1h$Sample),"CD4","CD8")
+# TCRHVlist_values<-read.csv("TCRBCRchain200/TRBVlist_values.csv")
+# T1h$variable<-factor(T1h$variable,levels = TCRHVlist_values$x)
+# T1h$SubTRV<-gsub("TR","",T1h$variable)
+# T1h$SubTRV<-factor(T1h$SubTRV,levels = gsub("TR","",TCRHVlist_values$x))
+```
+
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+T1h$CDtype<-ifelse(grepl("CD4",T1h$Sample),"CD4","CD8")
+TCRHVlist_values<-read.csv("TCRBCRchain200/TRBVlist_values.csv")
+T1h$variable<-factor(T1h$variable,levels = TCRHVlist_values$x)
+T1h$SubTRV<-gsub("TR","",T1h$variable)
+T1h$SubTRV<-factor(T1h$SubTRV,levels = gsub("TR","",TCRHVlist_values$x))
+my_comparisons <- list(
+  c("CD4", "CD8")
+
+)
+TCRBCD4CD8<-T1h %>% 
+ ggplot(aes(CDtype,value,fill=CDtype))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(.~ SubTRV, scales = "free", space = 'free', switch = "y") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = '')+scale_fill_npg()
+TCRBCD4CD8
+ggsave(plot=TCRBCD4CD8,"TCRBCRsig/TCRBVCD4CD8.pdf",width = 40,height = 10)
+```
+
+```{r}
+library(dplyr)
+library(ggpubr)
+library(ggsci)
+library(ggplot2)
+
+plot_TCRBCD4CD8 <- function(data_file, list_values_file, output_file) {
+  # Load the data
+  T1h <- read.csv(data_file)
+  TCRHVlist_values <- read.csv(list_values_file)
+  
+  # Process the data
+  T1h$CDtype <- ifelse(grepl("CD4", T1h$Sample), "CD4", "CD8")
+  T1h$variable <- factor(T1h$variable, levels = TCRHVlist_values$x)
+  T1h$SubTRV <- gsub("TR", "", T1h$variable)
+  T1h$SubTRV <- factor(T1h$SubTRV, levels = gsub("TR", "", TCRHVlist_values$x))
+  
+  my_comparisons <- list(c("CD4", "CD8"))
+  
+  # Create the plot
+  TCRBCD4CD8 <- ggplot(T1h, aes(CDtype, value, fill = CDtype)) +
+    geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black") + 
+    theme_bw(base_size = 16) + 
+    stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+    facet_grid(. ~ SubTRV, scales = "free", space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(panel.grid = element_blank(), 
+          panel.background = element_blank(), 
+          panel.border = element_blank(),
+          axis.line = element_line(color = "black"),
+          axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 12),
+          plot.title = element_text(hjust = 0.5),
+          legend.title = element_blank(), 
+          legend.key = element_blank()) +
+    labs(x = '', y = '', title = '') + 
+    scale_fill_npg()
+  
+  # Save the plot
+  ggsave(plot = TCRBCD4CD8, filename = output_file, width = 40, height = 10)
+}
+
+# Example usage:
+plot_TCRBCD4CD8("/home/maolp/Allcount/All_scanpyData/TCRchain//CD48TCRA_chainlong.csv", "TCRBCRchain200/TRAVlist_values.csv", "TCRBCRsig/TCRAV——CD4CD8.pdf")
+```
+
+
+```{r}
+plot_TCRBCD4CD82 <- function(data_file, list_values_file, output_file) {
+  # Load the data
+  T1h <- read.csv(data_file)
+  TCRHVlist_values <-  list_values_file
+  
+  # Process the data
+  T1h$CDtype <- ifelse(grepl("CD4", T1h$Sample), "CD4", "CD8")
+  T1h$variable <- factor(T1h$variable, levels = TCRHVlist_values$x)
+  T1h$SubTRV <- gsub("TR", "", T1h$variable)
+  T1h$SubTRV <- factor(T1h$SubTRV, levels = gsub("TR", "", TCRHVlist_values$x))
+  
+  my_comparisons <- list(c("CD4", "CD8"))
+  
+  # Create the plot
+  TCRBCD4CD8 <- ggplot(T1h, aes(CDtype, value, fill = CDtype)) +
+    geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black") + 
+    theme_bw(base_size = 16) + 
+    stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+    facet_grid(. ~ SubTRV, scales = "free", space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(panel.grid = element_blank(), 
+          panel.background = element_blank(), 
+          panel.border = element_blank(),
+          axis.line = element_line(color = "black"),
+          axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 12),
+          plot.title = element_text(hjust = 0.5),
+          legend.title = element_blank(), 
+          legend.key = element_blank()) +
+    labs(x = '', y = '', title = '') + 
+    scale_fill_npg()
+  
+  # Save the plot
+  ggsave(plot = TCRBCD4CD8, filename = output_file, width = 40, height = 10)
+}
+```
+
+
+```{r}
+plot_TCRBCD4CD8("/home/maolp/Allcount/All_scanpyData/TCRchain//TCRH_chainlong.csv", "TCRBCRchain200/TRBVlist_values.csv", "TCRBCRsig/TCRBV——CD4CD8.pdf")
+```
+
+```{r}
+TRBJ=read.csv("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRBlocus.csv") %>% .[grep("TRBJ",.$IMGT_gene_name),]
+colnames(TRBJ)<-c("x","order","locus")
+```
+
+```{r}
+  plot_TCRBCD4CD82("/home/maolp/Allcount/All_scanpyData/TCRchain//CD48TCRBJ_long.csv",TRBJ, "TCRBCRsig/TCRBJ——CD4CD8.pdf")
+```
+```{r}
+TRAJ=read.csv("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRAgenelocus.csv") %>% .[grep("TRAJ",.$IMGT_gene_name),]
+colnames(TRAJ)<-c("x","order","locus")
+  plot_TCRBCD4CD82("/home/maolp/Allcount/All_scanpyData/TCRchain//CD48TCRAJ_long.csv",TRAJ, "TCRBCRsig/TCRAJ——CD4CD8.pdf")
+```
+

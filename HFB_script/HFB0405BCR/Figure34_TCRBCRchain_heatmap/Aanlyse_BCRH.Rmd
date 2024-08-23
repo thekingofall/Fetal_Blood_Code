@@ -1,0 +1,300 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-12-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer )
+library(ComplexHeatmap)
+```
+
+
+```{r}
+source("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/util.R")
+```
+```{r}
+prepare_BCRH_data <- function(BCRH) {
+  # Split the 'Sample' column into 'CellType' and 'AdjusteID'
+  split_BCRH <- strsplit(BCRH$Sample, "_")
+
+  BCRH$CellType <- sapply(split_BCRH, "[", 1)
+  BCRH$AdjusteID <- sapply(split_BCRH, "[", 2)
+
+  # Extract the first character of 'AdjusteID' to create 'Organ'
+  BCRH$Organ <- substr(BCRH$AdjusteID, 1, 1)
+
+  # Factor the 'Sample' column based on the unique, sorted values
+  BCRH$Sample <- factor(BCRH$Sample, level = rev(sort(unique(BCRH$Sample))))
+
+  # Group by 'variable', filter out groups where sum of 'value' is not zero, then ungroup
+  BCRH2 <- BCRH %>%
+    group_by(variable) %>%
+    filter(sum(as.numeric(value)) != 0) %>%
+    ungroup()
+
+  # Extract 'Week' from 'AdjusteID' and determine 'Stage' based on 'Week'
+  BCRH2$Week <- as.numeric(substring(BCRH2$AdjusteID, 2, 5))
+  BCRH2$Stage <- ifelse(BCRH2$Week <= 26, 'Early', 'Late')
+BCRH2 <- BCRH2 %>% 
+  mutate(Organ = case_when(
+    Organ == "B" ~ "PBMC",
+    Organ == "L" ~ "Liver",
+    Organ == "S" ~ "Spleen",
+    Organ == "T" ~ "Thymus",
+    TRUE ~ Organ  
+  ))
+BCRH2$Organ_Stage=paste0(BCRH2$Stage,'_',BCRH2$Organ)
+  return(BCRH2)
+}
+
+my_comparisons <- list(
+  # c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  # c("Late_PBMC", "Early_Liver"),
+  # c("Late_PBMC", "Early_Spleen"),
+  # c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+```
+
+```{r}
+analyze_immue<- function(BCRH_chainlong, output_dir,name=name,wid1=20,he1=5) {
+  # Load libraries
+  library(tidyverse)
+  library(ggplot2)
+  library(dplyr)
+  library(ggpubr)
+  library(ggsci)
+  library(dplyr)
+
+  # Read data
+  # BCRH_chainlong <- read.csv(bcrh_chainlong_path)
+  # BCRHVlist_values <- read.csv(ighlistvalues_path)
+
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+
+  BCRH2<- prepare_BCRH_data(BCRH_chainlong)
+  BCRH3<-subset(BCRH2,Organ_Stage!="Late_PBMC")
+
+
+  print("Step1")
+  # Perform Wilcoxon tests
+  BCRH3results <- perform_wilcox_tests(BCRH3, "variable", "Organ_Stage", "value")
+
+  # Generate plots
+  BCRH4<-subset(BCRH3,BCRH3$variable %in% unique(subset(BCRH3results ,p_value<0.05)$variable))
+    print("Step2")
+  if (nrow(BCRH4)>0){
+      print("Step3")
+    PBCRH<-BCRH4%>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_violin(position = position_dodge(width = 0.1), scale = 'width')+  
+geom_boxplot(alpha=1,outlier.size=0, size=0.3, width=0.3,fill="white") +
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0, method = "wilcox.test") +
+ facet_wrap(~variable, scales = "free",ncol = 10) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = paste(name, ' in Early Organ'))+ scale_fill_manual(values = c('#C71000FF',"#f49128","#023f75","#5A9599FF") )
+  ggsave(plot = PBCRH, file.path(output_dir, paste0(name,"Stat.pdf")),width = wid1,height = he1)
+
+#   
+#   dodge <- position_dodge(width = 0.9)
+#     print("Step4")
+# # Then plot
+#   data_summary <- BCRH2 %>%
+#   group_by(CellType, variable, Organ_Stage) %>%
+#   summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+# P284 <-data_summary[data_summary$variable %in%  unique(subset(BCRH3results ,p_value<0.05)$variable),]%>%  ggplot( aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+#   geom_bar(stat = "identity", position = dodge) +
+#   geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+#   stat_compare_means(data =data_summary[data_summary$variable %in%  unique(subset(BCRH3results ,p_value<0.05)$variable),], comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+#   facet_grid(CellType ~ variable, scales = "free", space = 'free', switch = "y") +
+#   theme_classic() +
+#   theme_bw(base_size = 16) +
+#   theme(panel.grid = element_blank(), 
+#         panel.background = element_blank(), 
+#         panel.border = element_blank(),
+#         axis.line = element_line(color = "black"),
+#         axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+#         axis.text.y = element_text(size = 12),
+#         plot.title = element_text(hjust = 0.5),
+#         strip.text.x =  element_blank(),aspect.ratio = 1) + # Remove facet labels
+#   xlab("") +
+#   ylab("Composition (%)") +
+#   scale_fill_npg()
+
+# P284
+# 
+#   # Save plots
+# 
+#   # ggsave(plot = P283, file.path(output_dir, "merge.pdf"), width = 30, height = 10)
+#   ggsave(plot = P284, file.path(output_dir, paste0(name,"ColPlot.pdf")))
+  }
+
+
+
+# Define dodge width
+
+
+  # Output results
+  list(
+    BCRH=BCRH2,
+    wilcox_results = BCRH3results,
+    significant_variables = unique(subset(BCRH3results, p_value < 0.05)$variable)
+  )
+}
+```
+
+
+```{r}
+BCRH_chainlong <- read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/BCRH_chainlong.csv")
+results <-analyze_immue(
+  BCRH_chainlong ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="BCRH"
+)
+
+# Access the results
+# results$plots
+results$wilcox_results
+results$significant_variables
+```
+```{r}
+BCRHJ<-read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/BCRHJ_chainlong.csv")
+results <-analyze_immue(
+  BCRHJ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="BCRJ"
+)
+```
+```{r}
+BCRK<-read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/subBCRK_chainlong.csv")
+results <-analyze_immue(
+  BCRK,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="BCRKV"
+)
+```
+```{r}
+BCRL<-read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/subBCRL_chainlong.csv")
+results <-analyze_immue(
+  BCRL,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="BCRL"
+)
+```
+
+```{r}
+  # BCRH_chainlong <- read.csv(bcrh_chainlong_path)
+BCRLJ<-read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/BCRLJ_chainlong.csv")
+results <-analyze_immue(
+  BCRLJ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="BCRLJ",wid1 = 5
+)
+```
+
+```{r}
+CD48TCRA<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRA_chainlong.csv")
+CD4TRA<-CD48TCRA[grep("CD4",CD48TCRA$Sample),]
+results <-analyze_immue(
+  CD4TRA ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="CD4TCRA",wid1 = 20,he1 = 10
+)
+```
+
+```{r}
+CD48TCRA<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRA_chainlong.csv")
+CD8TRA<-CD48TCRA[grep("CD8",CD48TCRA$Sample),]
+results <-analyze_immue(
+  CD4TRA ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="CD8TCRA",wid1 = 20,he1 = 10
+)
+```
+```{r}
+CD48TCRB<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/TCRH_chainlong.csv")
+results <-analyze_immue(
+  CD48TCRB,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="AllTCRB",wid1 = 20,he1=10
+)
+```
+```{r}
+CD4TCRB<-CD48TCRB[grep("CD4",CD48TCRB$Sample),]
+results <-analyze_immue(
+  CD4TCRB ,
+  output_dir = "Gao_TCRBCRchain_Figure/",
+  name="CD4TCRB",wid1 = 20,he1 = 10
+)
+```
+
+```{r}
+CD48TCRJB<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRBJ_long.csv")
+CD4TCRJB<-CD48TCRJB[grep("CD4",CD48TCRJB$Sample),]
+results <-analyze_immue(
+  CD4TCRJB ,
+  output_dir = "Gao_TCRJBCRchain_Figure/",
+  name="CD4TCRJB",wid1 = 20,he1 = 10
+)
+```
+
+
+```{r}
+CD88TCRJB<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRBJ_long.csv")
+CD8TCRJB<-CD88TCRJB[grep("CD8",CD88TCRJB$Sample),]
+results <-analyze_immue(
+  CD8TCRJB ,
+  output_dir = "Gao_TCRJBCRchain_Figure/",
+  name="CD8TCRJB",wid1 = 20,he1 = 10
+)
+```
+
+```{r}
+CD48TCRAJ<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRAJ_long.csv")
+CD8TCRAJ<-CD48TCRAJ[grep("CD8",CD48TCRAJ$Sample),]
+results <-analyze_immue(
+  CD8TCRAJ ,
+  output_dir = "Gao_TCRAJCRchain_Figure/",
+  name="CD8TCRAJ",wid1 = 20,he1 = 20
+)
+```
+
+```{r}
+CD48TCRAJ<-read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRBJ_long.csv")
+CD8TCRAJ<-CD48TCRAJ[grep("CD8",CD48TCRAJ$Sample),]
+results <-analyze_immue(
+  CD8TCRAJ ,
+  output_dir = "Gao_TCRAJCRchain_Figure/",
+  name="CD8TCRAJ",wid1 = 20,he1 = 20
+)
+```
+

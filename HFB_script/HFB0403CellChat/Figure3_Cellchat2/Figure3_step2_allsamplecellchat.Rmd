@@ -1,0 +1,230 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-12-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# adata1 = readRDS("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/scdata.rds")
+```
+
+```{r}
+# %%R
+# library(CellChat)
+# process_cellchat2 <- function(adata, adjusted_id) {
+#   subset_data <- subset(adata, AdjustedID == adjusted_id)
+#   data.pbmc <- subset_data@assays$RNA@data
+#   cellmeta <- data.frame(group = as.character(subset_data$Last_cell_type), row.names = names(subset_data$Last_cell_type))
+#   
+#   cellchat <- createCellChat(object = data.pbmc)
+#   cellchat <- addMeta(cellchat, meta = cellmeta, meta.name = "labels")
+#   cellchat <- setIdent(cellchat, ident.use = "labels")
+#   
+#   CellChatDB <- CellChatDB.human
+#   CellChatDB.use <- subsetDB(CellChatDB, search = "Cell-Cell Contact", key = "annotation")
+#   cellchat@DB <- CellChatDB.use
+#   
+#   cellchat <- subsetData(cellchat)
+#   cellchat <- identifyOverExpressedGenes(cellchat)
+#   cellchat <- identifyOverExpressedInteractions(cellchat)
+#   cellchat <- projectData(cellchat, PPI.human)
+# 
+#   cellchat <- computeCommunProb(cellchat)
+#   cellchat <- computeCommunProbPathway(cellchat)
+#   cellchat <- aggregateNet(cellchat)
+#   
+#   return(cellchat)
+# }
+# 
+# # Get a list of all unique AdjustedID values
+# adjusted_ids <- levels(unique(adata1$AdjustedID))
+# 
+# # Run the function on all AdjustedID values and store the results in a list
+# results2 <- lapply(adjusted_ids, function(id) process_cellchat2(adata1, id))
+# print("start")
+# # Save the results as an RDS file
+# saveRDS(results2, file = "/home/maolp/Allcount/All_scanpyData/Data/Allsample_cellchat_results.rds")
+# 
+# system("python /home/maolp/Email.py cellchat")
+```
+
+```{r}
+results2=readRDS("/home/maolp/Allcount/All_scanpyData/Data/Allsample_cellchat_results.rds")
+```
+```{r}
+result <- lapply(1:32, function(x) {
+    col_name <- colnames(results2[[x]]@data)[1]
+    strsplit(col_name, "_")[[1]][1]
+})
+
+
+result_vector <- unlist(result)
+
+
+print(result_vector)
+```
+
+```{r}
+name=levels(unique(adata1$AdjustedID))
+write.csv(name,"Data/name.txt")
+library(dplyr)
+unique_data <- adata1@meta.data %>%
+  distinct(AdjustedID, Name)
+
+unique_data
+all(levels(unique_data$Name)==result_vector)
+
+```
+```{r}
+merged_cellchat2 <- mergeCellChat(results2, add.names =levels(unique(adata1$AdjustedID)))
+```
+
+```{r}
+gg1 <- compareInteractions(merged_cellchat2 , show.legend = F, group = c(1:32))
+gg2 <- compareInteractions(merged_cellchat2 , show.legend = F, group = c(1:32), measure = "weight")
+gg1 + gg2
+```
+
+
+```{r}
+```
+
+```{r}
+library(tidyverse)
+
+process_data <- function(data) {
+  data <- data %>%
+    separate(dataset, into = c("part1", "part2"), sep = "_") %>%
+    mutate(
+      Organ = substr(part1, 1, 1),
+      Week = substr(part1, 2, 5)
+    ) %>%
+    arrange(Organ,Week) %>%
+    mutate(
+      Stage = ifelse(as.numeric(Week) >= 26, "Late", "Early")
+    )
+  
+  return(data)
+}
+
+
+data1 <- process_data(gg1$data)
+data1$Organ_Stage <-paste0(data1$Organ,'_',data1$Stage)
+data1_PBMC=data1[grep('B',data1$Organ),]
+print(data1)
+
+```
+
+```{r}
+# %%R -w 1600 -h 1200 -r 300
+
+library(ggplot2)
+library(ggpubr)
+library(ggsci)
+data2 <- process_data(gg2$data)
+data2$Organ_Stage <-paste0(data2$Organ,'_',data2$Stage)
+data2$Organ_Stage<-factor(data2$Organ_Stage,level=c("B_Early", "B_Late", "L_Early","T_Early","S_Early"))
+my_comparisons <- list(
+  c("B_Early", "B_Late"),
+  c("B_Early", "L_Early"),
+  c("B_Early", "S_Early"),
+  c("B_Early", "T_Early"),
+  c("B_Late", "L_Early"),
+  c("B_Late", "S_Early"),
+  c("B_Late", "T_Early"),
+  c("L_Early", "S_Early"),
+  c("L_Early", "T_Early"),
+  c("S_Early", "T_Early")
+)
+p <- ggplot(data2, aes(x = Organ_Stage, y = count)) +
+#   geom_boxplot(aes())+
+#   geom_violin(position = position_dodge(width = 1), scale = 'width') +
+#   geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE) 
+geom_boxplot(alpha = .5) +
+    geom_point(position = position_jitter(seed = 2023, width = .25),
+               aes(color =Organ_Stage, shape =Organ_Stage ), alpha = .4, size = 3.5) +
+    theme(panel.grid = element_blank(), 
+          panel.background = element_blank(), 
+          panel.border = element_blank(),
+          axis.line = element_line(color = "black"),
+          axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 12),
+          plot.title = element_text(hjust = 0.5),
+          legend.title = element_blank(), 
+          legend.key = element_blank()) +
+    scale_fill_futurama() +
+    scale_color_futurama()
+
+p <- p + stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0.01) +
+theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'Interaction strength')+scale_fill_manual(values = c("#FFA300","#F6313E", "#fb862b", "#0eb0c8", "#6a73cf"))
+
+
+print(p)
+ggsave(plot=p,"/home/maolp/Allcount/All_scanpyData/Cellchat/PBMC_cellchat_boxplot.pdf",width=4,height=4)
+```
+
+```{r}
+# %%R -w 1600 -h 1200 -r 300
+
+library(ggplot2)
+library(ggpubr)
+
+data1$Organ_Stage<-factor(data1$Organ_Stage,level=c("B_Early", "B_Late", "L_Early","T_Early","S_Early"))
+p2 <- ggplot(data1, aes(x = Organ_Stage, y = count)) +
+geom_boxplot(alpha = .5) +
+    geom_point(position = position_jitter(seed = 2023, width = .25),
+               aes(color =Organ_Stage, shape =Organ_Stage ), alpha = .4, size = 3) +
+    theme(panel.grid = element_blank(), 
+          panel.background = element_blank(), 
+          panel.border = element_blank(),
+          axis.line = element_line(color = "black"),
+          axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+          axis.text.y = element_text(size = 12),
+          plot.title = element_text(hjust = 0.5),
+          legend.title = element_blank(), 
+          legend.key = element_blank()) +
+    scale_fill_futurama() +
+    scale_color_futurama()
+
+my_comparisons <- list(
+  c("B_Early", "B_Late"),
+  c("B_Early", "L_Early"),
+  c("B_Early", "S_Early"),
+  c("B_Early", "T_Early"),
+  c("B_Late", "L_Early"),
+  c("B_Late", "S_Early"),
+  c("B_Late", "T_Early"),
+  c("L_Early", "S_Early"),
+  c("L_Early", "T_Early"),
+  c("S_Early", "T_Early")
+)
+
+p2 <- p2 + stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0.01) + theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'Number of inferred interactions')+scale_fill_manual(values = c("#FFA300","#F6313E", "#fb862b", "#0eb0c8", "#6a73cf"))
+
+print(p2)
+ggsave(plot=p2,"/home/maolp/Allcount/All_scanpyData/Cellchat/PBMC_cellchat_boxplot_inferred_interactions.pdf",width=4,height=4)
+```
+

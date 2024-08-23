@@ -1,0 +1,395 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-02-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# results_by_module=readRDS('/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/Early_results_by_module_Go_results_by_module.RDS')
+# allmods=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/hsPBMC_Early_all_mods.csv")
+
+```
+
+
+```{r}
+Earlymods=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/202402hsPBMC_Early_all_mods.csv")
+Latemods=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/202402hsPBMC_Late_all_mods.csv")
+```
+```{r}
+
+```
+
+
+```{r}
+ErM=table(Earlymods$Module) %>% as.data.frame()
+ErM$Group<-"Early"
+```
+```{r}
+LateM=table(Latemods$Module)%>% as.data.frame()
+LateM$Group<-"Late"
+ELsum=rbind(ErM,LateM)
+library(ggsci)
+colnames(ELsum)=c("Lineage","Freq","Group")
+
+```
+
+
+```{r}
+# system("mkdir -p /home/Lipeng/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure2/Sup2others")
+ggplot(ELsum) +
+  geom_col(aes(Lineage, Freq, fill=Group), stat='identity', position=position_dodge()) +
+  geom_text(aes(Lineage, Freq, label=Freq, group=Group), 
+            position=position_dodge(width=0.9), 
+            vjust=-0.25) + 
+  scale_fill_jama() +
+  theme_classic()
+ggsave("/home/Lipeng/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure2/Sup2others/2024S2col.pdf")
+system("cp /home/Lipeng/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure2/Sup2others/2024S2col.pdf Data ")
+```
+
+```{r}
+source("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/util.R")
+```
+
+```{r}
+names(Lateresults_by_module)
+```
+
+```{r}
+dotplot(Earlyresults_by_module[[3]])
+```
+
+
+```{r}
+# %%R -i hsPBMC_Late_all_mods
+Latemods=Latemods
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(dplyr)
+
+
+query_genes <- function(genes, bk_grd, p_thresh = 0.05) {
+  ego <- enrichGO(genes, OrgDb = org.Hs.eg.db, 
+                  ont='ALL',pAdjustMethod = 'BH',pvalueCutoff = 0.05, 
+                  qvalueCutoff = 0.05, keyType = 'SYMBOL')
+  
+  return(ego)
+}
+
+
+Lateresults_by_module <- list()
+
+
+# grouped_mods <- Latemods %>% group_by(Module)
+
+
+for (mod_itr in sort(unique(Latemods$Module))) {
+  print(mod_itr)
+  #     mod_itr=1
+  range_genes <- Latemods[Latemods$Module == mod_itr, ]$Gene
+  ego <- query_genes(range_genes)
+  Lateresults_by_module[[paste("Module", mod_itr, sep = "-")]] <- ego
+}
+
+saveRDS(Lateresults_by_module,'Data/hsPBMC_Late_Latemods_Go_results_by_module.RDS')
+```
+
+```{r}
+dotplot(Lateresults_by_module[[7]])
+```
+
+```{r}
+Earlymods=Earlymods
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(dplyr)
+
+
+query_genes <- function(genes, bk_grd, p_thresh = 0.05) {
+  ego <- enrichGO(genes, OrgDb = org.Hs.eg.db, 
+                  ont='ALL',pAdjustMethod = 'BH',pvalueCutoff = 0.05, 
+                  qvalueCutoff = 0.05, keyType = 'SYMBOL')
+  
+  return(ego)
+}
+
+
+Earlyresults_by_module <- list()
+
+
+# grouped_mods <- Earlymods %>% group_by(Module)
+
+
+for (mod_itr in sort(unique(Earlymods$Module))) {
+  print(mod_itr)
+  #     mod_itr=1
+  range_genes <-Earlymods[Earlymods$Module == mod_itr, ]$Gene
+  ego <- query_genes(range_genes)
+  Earlyresults_by_module[[paste("Module", mod_itr, sep = "-")]] <- ego
+}
+
+saveRDS(Earlyresults_by_module,'Data/hsPBMC_Early_Earlymods_Go_results_by_module.RDS')
+```
+```{r}
+dotplot(Earlyresults_by_module[[2]])
+```
+
+```{r}
+# dotplot()
+```
+
+```{r}
+
+# top_paths_df <- do.call(rbind, top_paths)
+# top_paths_df$Label <- rep(names(top_paths), sapply(top_paths, nrow))
+# 
+# 
+# # results_by_module
+# head(top_paths_df)
+```
+
+
+```{r}
+get_top_paths <- function(results_by_module, ontology = "BP", top_n = 1, label_name = "Label",n2="") {
+  top_paths <- lapply(results_by_module, function(x) {
+    x1 <- dplyr::filter(x, ONTOLOGY == ontology)
+    top_entries <- dplyr::arrange(x1, p.adjust) %>% head(top_n)
+    return(top_entries)
+  })
+  top_paths_df <- do.call(rbind, top_paths)
+  top_paths_df[[label_name]] <- rep(names(results_by_module), sapply(top_paths, nrow))
+  top_paths_df$Group<-n2
+  return(top_paths_df)
+}
+
+
+Etop_paths_df <- get_top_paths(Earlyresults_by_module, top_n = 100,n2="Early")
+Ltop_paths_df <- get_top_paths(Lateresults_by_module, top_n = 100,n2="Late")
+
+```
+
+```{r}
+write.csv(Etop_paths_df,"Data/Etop_paths_df100.csv")
+write.csv(Ltop_paths_df,"Data/Ltop_paths_df100.csv")
+```
+
+```{r}
+datafr1=rbind(Etop_paths_df,Ltop_paths_df)
+```
+
+
+
+```{r}
+datafr1$Label<-gsub("Module-","",datafr1$Label)
+```
+
+```{r}
+Dataenrich=read.csv("Data/ELtop.csv")
+Dataenrich$Label<-gsub("Module-","",Dataenrich$Label)
+```
+
+```{r}
+library(RColorBrewer)
+colorsseq1 <-c("#f7fbff","#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#084594")
+col_fun1 = c("#4292c6", "#9c76c2","#272d74")
+P1=ggplot(Dataenrich)+geom_point(aes(Group,Description,size=Count,color=p.adjust))+theme_dose() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+    axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1))+xlab("")+ylab("")+ scale_size_continuous(breaks = c(10,30,60))+scale_color_gradientn(colours=rev(col_fun1) )+theme(aspect.ratio = 1)+facet_grid(Label~.,scales = "free")
+
+
+P1
+ggsave(plot =P1 ,"Data/Figure2_head1_EarlyandLate_GO.pdf",width = 10,height = 6)
+```
+```{r}
+datalist2=list()
+datalist=list()
+perform_GO2=function(gene_df) {
+  
+
+    
+
+    enrichGO_result <- enrichGO(gene_df, OrgDb = org.Hs.eg.db, ont = 'ALL', 
+                                pAdjustMethod = 'BH', pvalueCutoff = 0.05, 
+                                qvalueCutoff = 0.1, keyType = 'SYMBOL')
+    
+    
+    return(enrichGO_result)
+}
+```
+
+
+```{r}
+datalist=list()
+for (i in c("M1-ERY", "M2-Mono", "M3-MK", "M4-STEM", "M5-Bcell", "M6-NK", "M7-Tcell")) {
+  tem=setdiff(subset(Earlymods, Module == i)$Gene, subset(Latemods, Module == i)$Gene)
+  print(i)
+  dir.create(file.path("Data/EnrichEarly/", i), recursive = TRUE)  #
+  write.csv(tem, file.path("Data/EnrichEarly/", i, paste0(i, "_diff_eraly_late_gene.csv")), row.names = FALSE)
+  datalist[[paste0("E_", i)]] = perform_GO(tem)
+  
+    if (nrow(datalist[[paste0("E_", i)]]) > 0) {
+    library(ggsci)
+    library(enrichplot)
+    
+    P8 = enrichplot::dotplot(datalist[[paste0("E_", i)]], showCategory = 10, title = paste0(i, " GO All"))
+    ggsave(plot = P8, filename = file.path("Data/EnrichEarly/", i, paste0(i, "_diff_eraly_late_enrich.pdf")))
+  }
+
+  write.csv(datalist[[paste0("E_", i)]], file.path("Data/EnrichEarly/", i, paste0(i, "_diff_eraly_late_enrich.csv")), row.names = FALSE)
+}
+```
+
+```{r}
+
+```
+
+
+```{r}
+datalist2=list()
+for (i in c("M1-ERY", "M2-Mono", "M3-MK", "M4-STEM", "M5-Bcell", "M6-NK", "M7-Tcell")) {
+  tem = setdiff(subset(Latemods, Module == i)$Gene, subset(Earlymods, Module == i)$Gene)
+  print(i)
+  print(tem)
+  dir.create(file.path("Data/EnrichLate", i), recursive = TRUE)  # 使用dir.create而不是system创建目录
+  write.csv(tem, file.path("Data/EnrichLate", i, paste0(i, "_diff_eraly_late_gene.csv")), row.names = FALSE)
+  datalist2[[paste0("L_", i)]] = perform_GO(tem)
+  
+  if (nrow(datalist2[[paste0("L_", i)]]) > 0) {
+    library(ggsci)
+    library(enrichplot)
+    P9 = enrichplot::dotplot(datalist2[[paste0("L_", i)]], showCategory = 10, title = paste0(i, " GO All")) + scale_color_viridis_b()
+    ggsave(plot = P9, filename = file.path("Data/EnrichLate", i, paste0(i, "_diff_eraly_late_enrich.pdf")))
+  }
+
+  write.csv(datalist2[[paste0("L_", i)]], file.path("Data/EnrichLate", i, paste0(i, "_diff_eraly_late_enrich.csv")), row.names = FALSE)
+}
+```
+
+
+
+```{r}
+
+```
+
+
+```{r}
+datalist[["E_M1-ERY"]]
+```
+
+```{r}
+dotplot(datalist2[[1]])
+```
+```{r}
+# i="E_ERY"
+# head(datalist2[[i]])
+LateGO=data.frame()
+for (i in names(datalist2)) {
+  tem1=head(arrange(datalist2[[i]],desc(Count)))[1:20,]
+  tem1$Group<-i
+  LateGO=rbind(LateGO,tem1)
+  
+  
+}
+LateGO
+write.csv(LateGO,"Data/LateGOhead6.csv")
+```
+
+```{r}
+names(datalist)
+```
+
+```{r}
+EarlyGO=data.frame()
+for (i in names(datalist)) {
+  tem1=head(arrange(datalist[[i]],desc(Count)),100)[1:20,]
+  tem1$Group<-i
+  EarlyGO=rbind(EarlyGO,tem1)
+  
+  
+}
+
+
+write.csv(EarlyGO,"Data/EarlyGOhead6.csv")
+```
+
+```{r}
+Earlyhead2=read.csv("Data/Earlyhead2.csv",header = T,fill = T)
+
+# arlyhead2=read.csv("Data/Earlyhead2.csv",header = T,fill = T)
+Latehead2=read.csv("Data/Latehead2.csv",header = T)
+```
+```{r}
+ELhead=rbind(Earlyhead2,Latehead2)
+```
+```{r}
+library(dplyr)
+ELhead$Label=substring(ELhead$Group,1,1)
+ELhead$Label2=gsub("E_","",ELhead$Group) %>%gsub("L_","",.)
+```
+
+```{r}
+unique(ELhead$Description)
+ELhead
+```
+```{r}
+ELhead<-arrange(ELhead,Label2)
+```
+
+```{r}
+ELhead$Description2<-paste0(seq(1,nrow(ELhead)),"_",ELhead$Description)
+ELhead$Description2<-factor(ELhead$Description2,levels = ELhead$Description2)
+```
+```{r}
+
+```
+
+
+```{r}
+library(RColorBrewer)
+library(ggplot2)
+library(enrichplot)
+colorsseq1 <-c("#f7fbff","#deebf7","#c6dbef","#9ecae1","#6baed6","#4292c6","#2171b5","#084594")
+col_fun1 = c("#4292c6" , "#9c76c2","#272d74")
+P1xxx=ggplot(ELhead)+geom_point(aes(Label,Description2,size=Count,color=p.adjust))+theme_dose() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+    axis.text.y = element_text(angle = 0, vjust = 0.5, hjust=1)
+  )+xlab("")+ylab("")+ scale_size_continuous(breaks = c(5, 10, 15))+scale_color_gradientn(colours = rev(col_fun1) )+theme(aspect.ratio = 2)+facet_grid(Label2~Label,scales = "free")
+P1xxx
+
+```
+```{r}
+ggsave(plot=P1xxx,"Data/Enrich_EL.pdf",height = 10,width = 10)
+```
+
+
+```{r}
+
+genes_string <- "TRDV2/TRGC2/TRGV10/TRGV4/TRGV8/TRGV5/TRGV2/TRDV3/TRDV1"
+
+
+genes_vector <- strsplit(genes_string, "/")[[1]]
+
+# 打印向量
+print(genes_vector)
+
+cat(paste0('"', genes_vector, '"', collapse = ", "), "\n")
+```
+

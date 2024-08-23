@@ -1,0 +1,519 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-03-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#--------------------------
+### load R packages
+
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+library(ComplexHeatmap)
+```
+
+
+### Cell_types_list
+```{r}
+source("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/Cell_types_list.R")
+```
+
+
+### load Modified cellchat
+
+```{r}
+source("Figure3_Cellchat2.R")
+```
+
+
+### Load Color
+
+```{r}
+seqcolor4_bwr=c("#2166ac","#518bbd","#F0E68C","#d25e55","#b2182b")
+```
+
+```{r}
+
+library(ggsci)
+cols01 <- c("#f49128", "#194a55", "#187c65", "#f26115", "#c29f62", "#83ba9e")
+cols02 <- c("#c62d17", "#023f75", "#ea894e", "#266b69", "#eb4601", "#f6c619")
+cols03 <- c("#fa6e01", "#2f2f2f", "#972b1d", "#e6a84b", "#4c211b", "#ff717f")
+cols04 <- c("#223e9c", "#b12b23", "#aebea6", "#edae11", "#0f6657", "#c74732")
+cols05 <- c("#6a73cf", "#edd064", "#0eb0c8", "#f2ccac", "#a1d5b9", "#e1abbc")
+
+all_colors <- c(cols01, cols02, cols03, cols04, cols05)
+all_colors
+colorname2=c(pal_futurama()(3),"#46A040","#00AF99" ,"#F6313E", "#FFA300","#2f2f2f",  "#FFC179", 
+"#FF5A00", "#663366","#FF6666","#8F1336", "#0081C9", "#001588", "#CC0033",
+"#CC9966","#CC0033","#999933","#009966","#CCCC33","#CCFF99","#0eb0c8","#993333","#333366",
+"#490C65", "#BA7FD0","#A6CEE3", "#1F78B4", "#DE77AE", "#B2DF8A", "#006D2C", "#B5AD64",
+"#9DA8E2","#91C392", "#194a55", "#187c65", "#c29f62","#f49128","#c62d17", "#333329",
+"#023f75", "#ea894e", "#266b69",  "#e1abbc","#f6c619","#fa6e01", "#972b1d", "#e6a84b", "#4c211b", "#ff717f","#223e9c", 
+"#aebea6", "#edae11", "#c74732", "#6a73cf", "#edd064" , 
+"#0eb0c8", "#f2ccac" ,"#868686","#339966", "#83ba9e", "#b12b23", "#0f6657","#f26115","#eb4601")
+colorname3=colorname2
+length(colorname3)
+```
+
+#--------------------------
+### Load cellchat data
+```{r}
+GroupStat_ids <- c( "PBMC_Early","PBMC_Late"  )
+GroupStat_res<-readRDS("Data/PBMC_cellchat.rds")
+```
+
+```{r}
+GroupStat_res2<-list(GroupStat_res[[2]],GroupStat_res[[1]])
+PBMC_cellchat2 <- mergeCellChat(GroupStat_res2, add.names = c( "PBMC_Late" ,"PBMC_Early" ))
+```
+
+#--------------------------
+
+
+```{r}
+cell_types_list
+PBMC_cellchat2@idents$PBMC_Early<-factor(PBMC_cellchat2@idents$PBMC_Early,levels = cell_types_list)
+PBMC_cellchat2@idents$PBMC_Late<-factor(PBMC_cellchat2@idents$PBMC_Late,levels = cell_types_list)
+```
+
+### load scdata
+```{r}
+adata1 = readRDS("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/scdata.rds")
+subPBMC=subset(adata1,New_Body=="PBMC")
+```
+
+```{r}
+celltype=names(table(subPBMC@meta.data$Last_cell_type )[table(subPBMC@meta.data$Last_cell_type )>100])
+```
+
+
+### cell_types_list2
+```{r}
+cell_types_list2=intersect(cell_types_list,celltype)
+```
+
+
+#--------------------------
+### heatmap
+
+```{r}
+library(gridExtra)
+gg1 <- netVisual_heatmap666(PBMC_cellchat2,cluster.rows=F)$ht1
+#> Do heatmap based on a merged object
+gg2 <- netVisual_heatmap666(PBMC_cellchat2, measure = "weight")$ht1
+
+# pdf(file = "/home/maolp/Allcount/All_scanpyData/Cellchat/gg3.pdf", width = 10, height = 5)
+
+print(gg1+gg2)
+Plot_PBMC_cellchat=gg1+gg2
+# print(gg1)
+# pdf("~/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure3/Figure3C_diffcell_cellchat.pdf",width = 12,height = 6)
+# print(gg1+gg2)
+# dev.off()
+```
+```{r}
+gg1 <- compareInteractions(PBMC_cellchat2, show.legend = F, group = c(2,1), color.use =c("#C71000FF", "#008EA0FF"))
+gg2 <- compareInteractions(PBMC_cellchat2,show.legend = F, group = c(2,1), measure = "weight", color.use =c("#C71000FF", "#008EA0FF"))
+gg1 + gg2
+```
+
+### rankNet
+```{r}
+gg1 <- rankNet(PBMC_cellchat2, mode = "comparison", comparison = c(2,1),stacked = T, do.stat = TRUE, color.use =c("#C71000FF", "#008EA0FF"))
+gg2 <- rankNet(PBMC_cellchat2, mode = "comparison",comparison = c(2,1), stacked = F, do.stat = TRUE, color.use =c("#C71000FF", "#008EA0FF"))
+gg1 + gg2
+# pdf("~/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure3/S12/S12C_diffcell_cellchat_pathway.pdf",width = 12,height = 6)
+# print(gg1+gg2)
+# dev.off()
+```
+
+```{r}
+
+object.list=GroupStat_res2
+object.list[[1]]=netAnalysis_computeCentrality(object.list[[1]], slot.name = "netP") 
+object.list[[2]]=netAnalysis_computeCentrality(object.list[[2]], slot.name = "netP") 
+
+
+names(object.list)<-c("PBMC_late","PBMC_Early")
+```
+
+#--------------------------
+
+### identifyOverExpressedGenes
+
+
+```{r}
+i=1
+object.list[[i]]@idents<-factor(object.list[[i]]@idents,levels = cell_types_list2)
+object.list[[i+1]]@idents<-factor(object.list[[i+1]]@idents,levels = cell_types_list2)
+```
+
+```{r}
+PBMC_Earlyname <- cell_types_list[!cell_types_list %in% setdiff(cell_types_list,colnames(PBMC_cellchat2@net$PBMC_Early$prob))]
+```
+
+
+
+```{r}
+pos.dataset = "PBMC_Early"
+features.name = pos.dataset
+PBMC_cellchat2 <- identifyOverExpressedGenes(PBMC_cellchat2, group.dataset = "datasets", pos.dataset = pos.dataset, 
+                                            features.name = features.name, only.pos = FALSE, thresh.pc = 0.1, 
+                                            thresh.fc = 0.1, thresh.p = 1)
+```
+```{r}
+
+```
+
+
+### netup and netdown
+```{r}
+net <- netMappingDEG(PBMC_cellchat2, features.name = features.name)
+
+net.up <- subsetCommunication(PBMC_cellchat2, net = net, datasets = "PBMC_Early",ligand.logFC = 0.5, receptor.logFC = 0.5)
+
+net.down <- subsetCommunication(PBMC_cellchat2, net = net, datasets = "PBMC_Late",ligand.logFC = -0.1, receptor.logFC = -0.1)
+
+gene.up <- extractGeneSubsetFromPair(net.up, PBMC_cellchat2)
+gene.down <- extractGeneSubsetFromPair(net.down, PBMC_cellchat2)
+
+pairLR.use.up = net.up[, "interaction_name", drop = F]
+pairLR.use.down = net.down[, "interaction_name", drop = F]
+```
+
+
+#--------------------------
+# NK T
+### netVisual_bubble
+
+```{r}
+cell_types_list[which(cell_types_list %in%  "CXCR6+ NK" )]
+```
+
+
+```{r}
+gg1_NKT <-netVisual_bubble(PBMC_cellchat2, sources.use = which(cell_types_list %in%  celltype ) , targets.use =which(cell_types_list %in%  "NK T" ),  comparison = c(2,1), angle.x = 45,pairLR.use =)
+gg1_NKT
+```
+
+```{r}
+gg1_NKT <- netVisual_bubble(PBMC_cellchat2,  sources.use = which(cell_types_list %in%  celltype ) , targets.use = which(cell_types_list %in%  "NK T" ), comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))
+gg1_NKT
+```
+```{r}
+
+gg1_NKT2<-gg1_NKT$data[grep("LCK|MHC",gg1_NKT$data$pathway_name),]
+table(gg1_NKT2$pval)
+gg1_NKT2$pval<-"p<0.01"
+
+gg1_NKT2$pval<-factor(gg1_NKT2$pval,levels = c("0.05<p<0.01","p<0.01"))
+```
+### NKT
+```{r}
+gg1_NKT2$signif <- gg1_NKT2$pval 
+
+library(ggplot2)
+library(tidyverse)
+custom_cmap2 <- colorRampPalette(c(seqcolor4_bwr))(100)
+P1 = gg1_NKT2 %>% ggplot() + 
+  geom_point(aes(source, interaction_name, size = signif, color = prob)) +
+  theme_bw() + 
+  theme(
+    axis.line = element_line(color = "black"),
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank(), 
+    legend.key = element_blank()
+  ) +
+  facet_grid(dataset ~. , space = 'free', scales = "free", switch = "y") +
+  scale_color_gradientn(colours = custom_cmap2) +
+  scale_size_manual(values = c("p<0.01" = 4, "p >= 0.01" = 2),
+                    labels = c("p<0.01", "p >= 0.01")) +
+  xlab('')
+P1
+ggsave("Figure202403/Pair_NKT.pdf", P1, width = 8, height = 8)
+```
+
+```{r}
+gg1_NKT2<-gg1_NKT$data[grep("LCK|MHC",gg1_NKT$data$pathway_name),]
+gg1_NKT2$pval<-"p<0.01"
+table(gg1_NKT2$pval)
+```
+
+```{r}
+ which(cell_types_list %in%  celltype )
+```
+```{r}
+ cell_types_list[which(cell_types_list %in%  celltype )]
+```
+
+```{r}
+gg1_CX3CR1NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.up, sources.use = which(cell_types_list %in%  celltype ) , targets.use = 24, comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))
+gg1
+
+pairLR.use.down = net.down[, "interaction_name", drop = F]
+gg2_CX3CR1NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.down, sources.use = which(cell_types_list %in%  celltype ), targets.use = c(24), comparison = c(1,2),  angle.x = 90, remove.isolate = T,title.name = paste0("Down-regulated signaling in ", names(object.list)[2]))
+
+gg1_CX3CR1NK + gg2_CX3CR1NK
+```
+
+#--------------------------
+# NK
+### netVisual_bubble
+```{r}
+gg1_CX3CR1NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.up, sources.use = which(cell_types_list %in%  celltype ) , targets.use = 24, comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))
+gg1
+
+pairLR.use.down = net.down[, "interaction_name", drop = F]
+gg2_CX3CR1NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.down, sources.use = which(cell_types_list %in%  celltype ), targets.use = c(24), comparison = c(1,2),  angle.x = 90, remove.isolate = T,title.name = paste0("Down-regulated signaling in ", names(object.list)[2]))
+
+gg1_CX3CR1NK + gg2_CX3CR1NK
+```
+```{r}
+Gdata=gg1_CX3CR1NK$data
+Gdata$dataset=paste0(gg1_CX3CR1NK$data$dataset,":","CX3CR1+ NK")
+library(ggplot2)
+library(tidyverse)
+custom_cmap2 <- colorRampPalette(c(seqcolor4_bwr))(100)
+P1= Gdata %>% ggplot()+geom_point(aes(source,interaction_name,size=pval,color=prob))+theme_bw()+theme(
+      
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank())+facet_grid(.~dataset,space = 'free', scales = "free", switch = "y")+scale_color_gradientn(colours = custom_cmap2)+xlab('')
+P1
+```
+```{r}
+gg1_2NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.up, sources.use = which(cell_types_list %in%  celltype ) , targets.use = c(24,25), comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))
+gg1_2NK
+```
+
+```{r}
+gg1_3NK <- netVisual_bubble(PBMC_cellchat2, pairLR.use = pairLR.use.up, sources.use = which(cell_types_list %in%  celltype ) , targets.use = c(24,25,26), comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))
+```
+
+
+
+
+```{r}
+
+```
+### CD8
+```{r}
+Gdata=netVisual_bubble(PBMC_cellchat2,  sources.use = which(cell_types_list %in%  celltype ) , targets.use = which(cell_types_list %in%   "Naïve CD8 T"  ), comparison = c(2,1),  angle.x = 90, remove.isolate = T,title.name = paste0("Up-regulated signaling in ", names(object.list)[2]))$data
+
+Gdata$dataset=paste0(Gdata$dataset,":", "Naïve CD8 T" )
+Gdata<-Gdata[grep("MHC|LCK|SELPLG|ITGB2",Gdata$pathway_name),]
+# <-gsub()
+Gdata$pval<-gsub("2","0.05<p<0.01",Gdata$pval) %>% gsub("3","p<0.01",.)
+
+library(ggplot2)
+library(tidyverse)
+custom_cmap2 <- colorRampPalette(c(seqcolor4_bwr))(100)
+P1= Gdata[!grepl("Megakaryocytes|ERY",Gdata$source),] %>% ggplot()+geom_point(aes(source,interaction_name,size=pval,color=prob))+theme_bw()+theme(
+axis.line = element_line(color = "black"),
+axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+axis.text.y = element_text(size = 12),
+plot.title = element_text(hjust = 0.5),
+legend.title = element_blank(),
+legend.key = element_blank())+facet_grid(dataset~.,space = 'free', scales = "free", switch = "y")+scale_color_gradientn(colours = custom_cmap2)+xlab('')
+P1
+ggsave("Figure202403/Pair_CD8.pdf",width = 12,height = 12)
+
+```
+```{r}
+table(Gdata$pval)
+```
+
+### gg1_3NK
+
+```{r}
+table(test1$pval)
+```
+
+### NK3
+```{r}
+test1=subset(gg1_3NK$data,source!="Megakaryocytes") 
+  test1$dataset2 <- paste0(test1$dataset, ":",test1$target)
+test1$pval<-"p<0.01"
+test1$pval <- test1$pval
+  ptest1 <- ggplot(test1, aes(x = source, y = interaction_name, size = pval, color = prob)) +
+    geom_point() +
+    theme_bw() +
+    theme(
+      axis.line = element_line(color = "black"),
+      axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+      axis.text.y = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5),
+      legend.title = element_blank(), 
+      legend.key = element_blank()
+    ) +
+    facet_grid(dataset~ target, space = 'free', scales = "free", switch = "y") +
+    scale_color_gradientn(colours = custom_cmap2) +
+    scale_size_manual(values = c("p<0.01" = 4, "p >= 0.01" = 2),
+                    labels = c("p<0.01", "p >= 0.01")) +
+    xlab('')
+    ptest1
+    ggsave(plot =     ptest1,"Figure202403/pair_NK.pdf",width = 18,height = 8)
+
+```
+
+
+
+```{r}
+ggCD8signalingChanges <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "Naïve CD8 T",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+```
+
+
+
+
+# netAnalysis_signalingChanges_scatter
+```{r}
+GroupStat_res2<-list(GroupStat_res[[2]],GroupStat_res[[1]])
+GroupStat_res2[[1]]=netAnalysis_computeCentrality(GroupStat_res2[[1]], slot.name = "netP") 
+GroupStat_res2[[2]]=netAnalysis_computeCentrality(GroupStat_res2[[2]], slot.name = "netP") 
+PBMC_cellchat3 <- mergeCellChat(GroupStat_res2, add.names = c( "PBMC_Late" ,"PBMC_Early" ))
+```
+
+```{r}
+ggCD8signalingChanges <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "Naïve CD8 T",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+```
+
+```{r}
+ggNKTsignalingChanges <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "NK T",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+ggNKTsignalingChanges 
+```
+
+```{r}
+# da1<-arrange(da1,incoming)
+```
+```{r}
+ggNKTsignalingChanges <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "NK T",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+ggNKTsignalingChanges 
+# da1<-arrange(da1,incoming)
+da51=subset(ggNKTsignalingChanges$data)
+ggplot(da51)+geom_bar(aes(reorder(labels,incoming),incoming,fill=labels),stat = "identity")+theme_classic()+ theme(axis.text.x=element_text(angle=90, hjust=1))+labs(title = "Signaling changes of NKT(PBMC_Early vs.PBMC_Late)",  y = "Differential incoming interaction strength(PBMC_Early vs.PBMC_Late)")
+```
+```{r}
+ggCD8signalingChanges <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "Naïve CD8 T",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+ggCD8signalingChanges 
+da1=subset(ggCD8signalingChanges$data)
+da1<-arrange(da1,incoming)
+
+ggplot(da1)+geom_bar(aes(reorder(labels,incoming),incoming,fill=labels),stat = "identity")+theme_classic()+ theme(axis.text.x=element_text(angle=90, hjust=1))+labs(title = "Signaling changes of CD8(PBMC_Early vs.PBMC_Late)",  y = "Differential incoming interaction strength(PBMC_Early vs.PBMC_Late)")
+```
+```{r}
+
+```
+
+
+```{r}
+# da1=subset(ggNKTsignalingChanges$data,outgoing>=0& incoming>=0)
+# da12=subset(da1,outgoing>0.3 |incoming>0.3)
+da1=subset(ggNKTsignalingChanges$data)
+da12=subset(da1,outgoing>0.3 |incoming>0.3)
+# subset(gg1CX3CR1NKsignalingChanges$data,outgoing>0& incoming>0) %>% 
+da1 %>% 
+ggplot()+geom_point(aes(outgoing,incoming),color= "black",fill="#490C65",size=3,shape=21)+geom_point(aes(outgoing,incoming),color= "black",fill="#490C65",size=3,shape=21)+theme_linedraw() + theme(panel.grid = element_blank()) + 
+        geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", 
+            size = 0.25) + geom_vline(xintercept = 0, linetype = "dashed", 
+        color = "grey50", size = 0.25) + theme(text = element_text(size = 10), 
+        legend.key.height = grid::unit(0.15, "in")) + labs(title = "Signaling changes of NKT(PBMC_Early vs.PBMC_Late)", 
+        x ="Differential outcoming interaction strength", y = "Differential incoming interaction strength") + theme(plot.title = element_text(size = NULL, 
+        hjust = 0.5, face = "plain")) + theme(axis.line.x = element_line(size = 0.25), 
+        axis.line.y = element_line(size = 0.25)) + theme(legend.title = element_blank())+ ggrepel::geom_text_repel(data = da12, 
+            mapping = aes(outgoing,incoming,label = labels), color="#C71000FF",
+            size = 3, show.legend = F, segment.size = 0.2, 
+            segment.alpha = 0.5)+theme(aspect.ratio = 2)
+```
+
+
+
+
+```{r}
+gg3 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3, idents.use = "CD56highCD16low NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF"))+theme(aspect.ratio = 1.5)
+gg3
+```
+
+```{r}
+gg2 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "CXCR6+ NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF"))+theme(aspect.ratio = 1.5)
+gg2
+```
+
+```{r}
+gg1 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat3 , idents.use = "CX3CR1+ NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF"))+theme(aspect.ratio = 1.5)
+gg1
+```
+
+```{r}
+library(hrbrthemes)
+# da1=subset()
+da12=subset(gg1$data,incoming>0.3)
+da12$Group<-"CX3CR1+ NK"
+da21=subset(gg2$data,incoming>0.3)
+da21$Group="CXCR6+ NK"
+da31=subset(gg3$data,incoming>0.3)
+da31$Group="CD56highCD16low NK"
+
+da42=subset(ggCD8signalingChanges$data,incoming>0.3 )
+da42$Group="Naïve CD8 T"
+GNK=rbind(rbind(da12,da21),da31)
+da52=subset(da51,incoming <(-0.3))
+da52$Group="NK T"
+GNK2=do.call(rbind,list(da12,da21,da31,da42,da52))
+
+```
+
+
+```{r}
+color_palette <- c(
+"#8ECAE6", "#219EBC", "#023047", "#A3B18A", "#588157", "#3A5A40",
+"#FFD6A5", "#FDAC53", "#E76F51", "#F8C8DC", "#E63946", "#A31621",
+"#C7CEEA", "#A9A7D9", "#5C5470", "#E5E5E5", "#BDBDBD", "#616161",
+"#FFB703", "#48CAE4"
+)
+P1 = ggplot(GNK2) +
+geom_bar(aes(reorder(labels, desc(incoming)), incoming, fill = labels), color = "white", stat = "identity") +
+facet_grid(. ~ Group, space = 'free', scales = "free", switch = "y") +
+theme_minimal() +
+scale_fill_manual(values = color_palette[c(1,5,7,8,9,11,13,15,17,20)]) +
+xlab("") +
+ylab("Differential incoming interaction strength\n(PBMC_Early vs.PBMC_Late)") +
+theme(
+axis.text.x = element_text(angle = 90, hjust = 1),
+plot.background = element_rect(fill = "white"),
+panel.background = element_rect(fill = "white"),
+panel.grid = element_blank(),
+text = element_text(size = 12),
+axis.title = element_text(size = 14),
+strip.text = element_text(size = 12),
+plot.margin = margin(10, 10, 10, 10),
+legend.position = "none"
+)
+P1
+ggsave("Figure202403/P1.pdf", P1, width = 10, height = 5)
+```
+
+
+
+
+```{r}
+ggplot(GNK2)+geom_bar(aes(reorder(labels,desc(incoming)),incoming,fill=labels),color="white",stat = "identity")+facet_grid(.~Group,space = 'free', scales = "free", switch = "y")+theme_linedraw()+scale_fill_aaas()+scale_color_aaas()+xlab("")+ylab("Differential incoming interaction strength\n(PBMC_Early vs.PBMC_Late)")+ theme(axis.text.x=element_text(angle=90, hjust=1))
+ggsave("Figure202403/P1.pdf", P1, width = 10, height = 5)
+```
+
+```{r}
+GNK
+```
+

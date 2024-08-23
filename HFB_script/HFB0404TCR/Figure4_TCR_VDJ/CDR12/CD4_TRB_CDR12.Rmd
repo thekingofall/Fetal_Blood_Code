@@ -1,0 +1,266 @@
+---
+title: "Gao_TRA_CDR12"
+output: html_document
+date: "2023-10-30"
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+
+
+```{r}
+# %%R -w 500 -h 300 
+TCRdir="TCR_all/"
+TCRsamples=list.files(path = TCRdir,"csv")
+AllTCR=data.frame()
+for (line in TCRsamples) {
+#   print(line)
+  name=gsub("_TCR_filtered_contig_annotations.csv","",line)
+  print(name)
+  if (!name %in% c("C27","Z28")){
+     Test_TCR<-read.csv(file.path(TCRdir,line))
+     Test_TCR$barcodename=paste0(name,"_",Test_TCR$barcode)
+     Test_TCR$Group<-name
+     AllTCR=rbind(AllTCR,Test_TCR)
+  }
+ 
+}
+head(AllTCR)
+
+```
+```{r}
+subTRA=AllTCR[AllTCR$chain=="TRA",]
+subTRA=AllTCR[AllTCR$chain=="TRA",]
+```
+
+```{r}
+TCRobs=read.csv("TCRobs.csv")
+TCRobs
+```
+
+
+```{r}
+length(intersect(TCRobs$Cellname,subTRA$barcodename))
+subTRAobs<-merge(subTRA,TCRobs,by.x="barcodename",by.y="Cellname")
+
+```
+
+```{r}
+table(nchar(subTRAobs$cdr3))
+```
+```{r}
+subTRAobs[,c("cdr3","IR_VDJ_1_junction_aa")]
+subTRAobs2<-subTRAobs[!duplicated(subTRAobs$barcodename),]
+# all(subTRAobs2$cdr3==subTRAobs2$IR_VDJ_1_junction_aa)
+subTRAobs2<-subset(subTRAobs2,Last_cell_type=="Naïve CD4 T")
+unique(subTRAobs2$Last_cell_type)
+```
+
+```{r}
+colnames(subTRAobs)
+```
+
+
+```{r}
+library(tidyverse)
+```
+### CDR1
+
+```{r}
+subTRAobs2$CDR1length = nchar(subTRAobs2$cdr1)
+table(subTRAobs2[, c("AdjustedID", "CDR1length")]) %>% as.matrix() %>% as.data.frame() -> dfCDR1
+table(dfCDR1$CDR1length)
+df_wideCDR1 <- dfCDR1 %>%
+  spread(key = CDR1length, value = Freq)
+df_percCDR1 <- df_wideCDR1
+df_percCDR1[, -1] <-
+  t(apply(df_percCDR1[, -1], 1, function(x)
+    x / sum(x) * 100))
+library(reshape2)
+df_perc2CDR1 <- melt(df_percCDR1, id.vars = c("AdjustedID"))
+df_perc2CDR1$variable <-
+  as.numeric(as.character(df_perc2CDR1$variable))
+df_perc2CDR1$Week=substring(df_perc2CDR1$AdjustedID,2,5) %>% as.character() %>% as.numeric()
+df_perc2CDR1$Stage<-ifelse(df_perc2CDR1$Week>28,"PBMC_Late","PBMC_Early")
+```
+```{r}
+library(ggpubr)
+library(ggsci)
+my_comparisons <- list(c("PBMC_Early", "PBMC_Late"))
+PCDR1=ggplot(df_perc2CDR1[grep("B",df_perc2CDR1$AdjustedID),], aes(Stage, value)) + geom_boxplot(position = position_dodge(width = 1), show.legend = FALSE, color = "black")+geom_point(position = position_jitter(seed = 2023, width = .25),
+             aes(color = Stage,shape=Stage), alpha = .4, size = 3)+
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0.01) +
+  facet_wrap(~variable, scales = "free") +theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +scale_fill_futurama()+xlab("")+ylab("Percentage %")+scale_color_manual(values = pal_futurama()(3)[2:3])+ggtitle("CD4 TRAV CDR1")
+PCDR1
+```
+```{r}
+df_perc2CDR1[grep("B",df_perc2CDR1$AdjustedID),]
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+P1CDR1_len=df_perc2CDR1[grep("B", df_perc2CDR1$AdjustedID), ] %>%
+  mutate(Week = as.numeric(substring(AdjustedID, 2, 5)) - 2) %>%
+  ggplot() +
+  geom_line(aes(x = variable, y = value, color = Week,group=AdjustedID)) +
+  theme_classic() +
+  scale_color_gradientn(colors = rev(colorRampPalette(c("#FFA300","#6a73cf","#00AF99","#98D9E9" ))(100))) +labs(x="CDR1 length",y="Percentage(%)")+
+  ggtitle("CD4 TRA CDR1")+theme(plot.title = element_text(hjust = 0.5))+scale_x_continuous(breaks = c(5,6,7))
+# colnames()
+P1CDR1_len
+```
+```{r}
+ggsave(plot=P1CDR1_len,"Figure/CD4_TRA_P1CDR1_len.pdf")
+```
+
+
+
+
+
+### CDR2
+```{r}
+PBMC_perc2CDR1=df_perc2CDR1[grep("B",df_perc2CDR1$AdjustedID),] %>%  mutate(Week = as.numeric(substring(AdjustedID, 2, 5)) - 2)
+PBMC_perc2CDR1_pvalue <- PBMC_perc2CDR1 %>%
+  group_by(variable) %>%
+  nest() %>% 
+  mutate(correlation = map(data, ~cor.test(.x$Week, .x$value, method = "spearman")) %>% map(broom::tidy)) %>%
+  unnest(correlation) %>%
+  select(variable, estimate, p.value)
+
+```
+```{r}
+PBMC_perc2CDR1_pvalue$pvalue_cat <- cut(PBMC_perc2CDR1_pvalue$p.value,
+                                        breaks = c(0, 0.0001, 0.001, 0.01, 0.05, Inf),
+                                        
+                                        labels = c('< 0.0001', '0.0001-0.001', '0.001-0.01',
+                                                   '0.01-0.05', '> 0.05'),
+                                        include.lowest = TRUE)
+
+
+colors <- c('< 0.0001' = "#C71000B2", '0.0001-0.001' =  "#FF6348B2", 
+            '0.001-0.01' = "#FF95A8B2", '0.01-0.05' = "#8A4198B2" ,
+            '> 0.05' ="#008EA0B2" )
+
+PCDR1value=ggplot(PBMC_perc2CDR1_pvalue, aes(x = factor(variable), y = estimate, fill =pvalue_cat)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = colors) +
+  labs(x = "Lengths", y = "R Value with Times", fill = "P Value") +
+  theme_bw()+ggtitle("CD4 TRA CDR1(aa) lengths")+ 
+  theme(plot.title = element_text(hjust = 0.5,  face = "bold"))+scale_y_continuous(limits = c(-1,1))
+PCDR1value
+ggsave(plot=PCDR1value,"Figure/CD4 TRA1_PCDR1value.pdf",width = 2,height = 2)
+```
+
+```{r}
+subTRAobs2$CDR2length = nchar(subTRAobs2$cdr2)
+table(subTRAobs2[, c("AdjustedID", "CDR2length")]) %>% as.matrix() %>% as.data.frame() -> dfCDR2
+table(dfCDR2$CDR2length)
+df_wideCDR2 <- dfCDR2 %>%
+  spread(key = CDR2length, value = Freq)
+df_percCDR2 <- df_wideCDR2
+df_percCDR2[, -1] <-
+  t(apply(df_percCDR2[, -1], 1, function(x)
+    x / sum(x) * 100))
+library(reshape2)
+df_perc2CDR2 <- melt(df_percCDR2, id.vars = c("AdjustedID"))
+df_perc2CDR2$variable <-
+  as.numeric(as.character(df_perc2CDR2$variable))
+
+
+df_perc2CDR2[grep("B",df_perc2CDR2$AdjustedID),]%>%  mutate(Week = as.numeric(substring(AdjustedID, 2, 5)) - 2) %>% 
+ggplot() + geom_line( aes(variable, value, color = Week,group=AdjustedID))+theme(panel.grid = element_blank(), 
+                                                panel.background = element_blank(), 
+                                                panel.border = element_blank(),
+                                                axis.line = element_line(color = "black"),
+                                                axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+                                                axis.text.y = element_text(size = 12),
+                                                plot.title = element_text(hjust = 0.5),
+                                                legend.title = element_blank(), 
+                                                legend.key = element_blank())+ggtitle("CD4 TRA CDR2")+scale_x_continuous(breaks = c(5,6,7,8))+scale_color_gradientn(colors = rev(colorRampPalette(c("#FFA300","#6a73cf","#00AF99","#98D9E9" ))(100))) + labs(x="CDR2 length",y="Percentage(%)")->P2CDR2_len
+P2CDR2_len
+ggsave(plot=P2CDR2_len,"Figure/CD4_TRA_P2CDR2_len.pdf")
+```
+
+```{r}
+PBMC_perc2CDR2=df_perc2CDR2[grep("B",df_perc2CDR2$AdjustedID),] %>%  mutate(Week = as.numeric(substring(AdjustedID, 2, 5)) - 2)
+PBMC_perc2CDR2_pvalue <- PBMC_perc2CDR2 %>%
+  group_by(variable) %>%
+  nest() %>% 
+  mutate(correlation = map(data, ~cor.test(.x$Week, .x$value, method = "spearman")) %>% map(broom::tidy)) %>%
+  unnest(correlation) %>%
+  select(variable, estimate, p.value)
+```
+
+
+```{r}
+PBMC_perc2CDR2_pvalue$pvalue_cat <- cut(PBMC_perc2CDR2_pvalue$p.value,
+                       breaks = c(0, 0.0001, 0.001, 0.01, 0.05, Inf),
+                       
+                       labels = c('< 0.0001', '0.0001-0.001', '0.001-0.01',
+                                  '0.01-0.05', '> 0.05'),
+                       include.lowest = TRUE)
+
+  
+  colors <- c('< 0.0001' = "#C71000B2", '0.0001-0.001' =  "#FF6348B2", 
+              '0.001-0.01' = "#FF95A8B2", '0.01-0.05' = "#8A4198B2" ,
+              '> 0.05' ="#008EA0B2" )
+
+P3TRACDR2_value=ggplot(PBMC_perc2CDR2_pvalue, aes(x = factor(variable), y = estimate, fill =pvalue_cat)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = colors) +
+    labs(x = "Lengths", y = "R Value with Times", fill = "P Value") +
+    theme_bw()+ggtitle("CD4 TRA CDR2(aa) lengths")+ 
+theme(plot.title = element_text(hjust = 0.5, face = "bold"))+scale_y_continuous(limits = c(-0.8,0.8),breaks = seq(-0.8,0.8,0.2))
+P3TRACDR2_value
+```
+```{r}
+ggsave(plot=P3TRACDR2_value,"Figure/TRA_P3TRACDR2_value.pdf")
+```
+```{r}
+df_perc2CDR2$variable <-
+  as.numeric(as.character(df_perc2CDR2$variable))
+df_perc2CDR2$Week=substring(df_perc2CDR2$AdjustedID,2,5) %>% as.character() %>% as.numeric()
+df_perc2CDR2$Stage<-ifelse(df_perc2CDR2$Week>28,"PBMC_Late","PBMC_Early")
+```
+
+
+```{r}
+
+library(ggpubr)
+library(ggsci)
+my_comparisons <- list(c("PBMC_Early", "PBMC_Late"))
+PCDR2=ggplot(df_perc2CDR2[grep("B",df_perc2CDR2$AdjustedID),], aes(Stage, value)) + geom_boxplot(position = position_dodge(width = 1), show.legend = FALSE, color = "black")+geom_point(position = position_jitter(seed = 2023, width = .25),
+                                                                                                                                                                                        aes(color = Stage,shape=Stage), alpha = .4, size = 3)+
+  stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0.01) +
+  facet_wrap(~variable, scales = "free",ncol = 5) +theme(panel.grid = element_blank(),
+                                                panel.background = element_blank(),
+                                                panel.border = element_blank(),
+                                                axis.line = element_line(color = "black"),
+                                                axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+                                                axis.text.y = element_text(size = 12),
+                                                plot.title = element_text(hjust = 0.5),
+                                                legend.title = element_blank(),
+                                                legend.key = element_blank()) +scale_fill_futurama()+scale_color_manual(values = pal_futurama()(3)[2:3])+xlab("")+ylab("Percentage %")+ggtitle("CD4 TRAV CDR2")
+PCDR2
+```
+
+

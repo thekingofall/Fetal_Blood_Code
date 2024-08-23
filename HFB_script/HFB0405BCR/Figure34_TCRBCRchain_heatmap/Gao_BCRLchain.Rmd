@@ -1,0 +1,243 @@
+---
+---
+title: "Untitled"
+author: "MLP"
+date: "2023-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+BCRL_chainlong=read.csv("/home/maolp/Allcount/All_scanpyData/BCRTCRchain/")
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer )
+library(ComplexHeatmap)
+BCRL=BCRL_chainlong
+```
+
+```{r}
+BCRLVlist_values<-read.csv("TCRBCRchain200/IGKlistvalues.csv")
+```
+
+```{r}
+BCRL$variable<-factor(BCRL$variable,level=BCRLVlist_values$x)
+```
+
+
+```{r}
+library(dplyr)
+
+
+
+split_BCRL<- strsplit(BCRL$Sample, "_")
+
+
+BCRL$CellType <- sapply(split_BCRL, "[", 1)
+BCRL$AdjusteID<- sapply(split_BCRL, "[", 2)
+
+BCRL$Organ <- substr(BCRL$AdjusteID, 1, 1)
+BCRL$Sample<-factor(BCRL$Sample,level=rev(sort(unique(BCRL$Sample))))
+BCRL2 <- BCRL %>% group_by(variable) %>% filter(sum(as.numeric(value) )!= 0) %>%ungroup()
+BCRL2$Week<-substring(BCRL2$AdjusteID,2,5) %>% as.numeric()
+BCRL2$Stage<-ifelse(BCRL2$Week<=28,'Early','Late')
+
+
+library(dplyr)
+
+BCRL2 <- BCRL2 %>% 
+  mutate(Organ = case_when(
+    Organ == "B" ~ "PBMC",
+    Organ == "L" ~ "Liver",
+    Organ == "S" ~ "Spleen",
+    Organ == "T" ~ "Thymus",
+    TRUE ~ Organ  
+  ))
+BCRL2$Organ_Stage=paste0(BCRL2$Stage,'_',BCRL2$Organ)
+```
+```{r}
+BCRL2$Organ_Stage<-factor(BCRL2$Organ_Stage,levels = c("Early_PBMC"  , "Late_PBMC",  "Early_Liver", "Early_Thymus" ,  "Early_Spleen" ))
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(BCRL2, CellType == "IGKC+Naïve B")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P2A=subset(BCRL2,CellType=="IGKC+Naïve B") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'BCRL_ratio in IGKC+Naïve B')+scale_fill_npg()
+ P2A
+ ggsave(plot = P2A,'Gao_TCRBCRchain_Figure/IGKCposNaïveBBCRL.pdf',width = 20,height = 40)
+```
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(BCRL2, CellType == "IGKC-Naïve B")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P8A=subset(BCRL2,CellType=="IGKC-Naïve B") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+# stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'BCRL_ratio in IGKC-Naïve B')+scale_fill_npg()
+ P2A
+ ggsave(plot = P8A,'Gao_TCRBCRchain_Figure/IGKCnegNaïveBBCRL.pdf',width = 20,height = 40)
+```
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P283=subset(BCRL2)%>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_bar(stat = 'identity',position = "dodge")+ 
+  # theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(CellType~variable, scales = "free", space='free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))+xlab("")+ylab("Composition (%)")+scale_fill_npg()
+ P283
+```
+
+```{r}
+# BCRL2$value %>% 
+```
+
+```{r}
+# First, calculate mean and se for each group
+data_summary <- BCRL2 %>%
+  group_by(CellType, variable, Organ_Stage) %>%
+  summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+
+# Define dodge width
+dodge <- position_dodge(width = 0.9)
+
+# Then plot
+P284 <- ggplot(data_summary, aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+  geom_bar(stat = "identity", position = dodge) +
+  geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+  stat_compare_means(data = data_summary, comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(CellType ~ variable, scales = "free", space = 'free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        strip.text.x =  element_blank()) + # Remove facet labels
+  xlab("") +
+  ylab("Composition (%)") +
+  scale_fill_npg()
+
+P284
+```
+```{r}
+ggsave(plot=P284,"Gao_TCRBCRchain_Figure/BCRL_merge.pdf",width = 40,height = 10)
+```
+```{r}
+# First, calculate mean and se for each group
+data_summary <- BCRL2 %>%
+  group_by(CellType, variable, Organ_Stage) %>%
+  summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+
+# Define dodge width
+dodge <- position_dodge(width = 0.9)
+
+# Then plot
+P285 <- ggplot(data_summary, aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+  geom_bar(stat = "identity", position = dodge) +
+  geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+  # stat_compare_means(data = data_summary, comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(variable ~ CellType, scales = "free", space = 'free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 16),
+        plot.title = element_text(hjust = 0.5),
+        strip.text.y =  element_blank()) + # Remove facet labels
+  xlab("") +
+  ylab("Composition (%)") +
+  scale_fill_npg()+coord_flip()
+
+print(P285)
+ggsave(plot=P285,"Gao_TCRBCRchain_Figure/BCRL_merge2.pdf",height = 40,width = 10)
+```
+```{r}
+
+```
+
+

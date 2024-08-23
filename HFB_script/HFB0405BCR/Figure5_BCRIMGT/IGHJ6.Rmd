@@ -1,0 +1,215 @@
+---
+title: "IGHJ6"
+output: html_document
+date: "2024-03-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+BCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount//All_scanpyData/Data/BCRobs.csv")
+BCRobs<-BCRobs[grep("PBMC",BCRobs$New_Body),]
+```
+
+```{r}
+library(data.table)
+library(tidyverse)
+```
+
+```{r}
+read_and_assign <- function(folder) {
+  file_path <- paste0("IMGT_HighV-QUEST/",folder, "/6_Junction.txt")
+  # print(file_path)
+  assign(paste0(folder, "_data"), fread( file_path ,header = T), envir = .GlobalEnv)
+}
+
+
+folders <- c("IGH", "IGK", "IGL", "IGH", "IGH")
+
+
+lapply(folders, read_and_assign)
+```
+```{r}
+table(nchar(IGH_data$`D-REGION`))
+```
+```{r}
+IGHJ6_data=subset(IGH_data,grepl("IGHJ6",`J-GENE and allele`))
+```
+
+```{r}
+table(nchar(IGH_data$`5'J-REGION`))
+```
+
+```{r}
+BCRobs$VID<-paste0(BCRobs$Cellname)
+IGH_data2<-merge(IGHJ6_data,BCRobs,by.x="Sequence ID",by.y="VID")
+IGH_data2$ntlen=nchar(IGH_data2$JUNCTION)
+IGH_data2$Week<-substring(IGH_data2$AdjustedID,2,5) %>% as.numeric()
+IGH_ntlen=IGH_data2[,c("Week","ntlen","AdjustedID")]
+IGHnttable=table(IGH_ntlen$AdjustedID,IGH_ntlen$ntlen) %>% as.data.frame()
+colnames(IGHnttable)<-c("AdjustedID","Ntlen","Freq")
+IGHnttable2=IGHnttable %>%
+  group_by(AdjustedID,Ntlen) %>%
+  summarise(Freq_sum = sum(Freq)) %>%
+  mutate(Freq_ratio = Freq_sum / sum(Freq_sum)) %>% mutate(Week=as.numeric(substring(AdjustedID,2,5)))%>%mutate(Ntlen=as.character(Ntlen))
+```
+```{r}
+ggplot(IGHnttable2)+geom_point(aes(as.numeric(Ntlen),Freq_ratio,color=Week))+geom_smooth(aes(as.numeric(Ntlen),Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()
+```
+```{r}
+process_IGH_data <- function(IGH_data, junction_field) {
+  data <- IGH_data
+  data$ntlen <- nchar(data[[junction_field]])
+
+  data_sub <- data[, c( "ntlen", "AdjustedID")]
+  nt_table <- table(data_sub$AdjustedID, data_sub$ntlen) %>% as.data.frame()
+  print("test")
+  colnames(nt_table) <- c("AdjustedID", "Ntlen", "Freq")
+  print("test2")
+  nt_table2 <- nt_table %>%
+    group_by(AdjustedID, Ntlen) %>%
+    summarise(Freq_sum = sum(Freq)) %>%
+    mutate(Freq_ratio = Freq_sum / sum(Freq_sum)*100) %>%
+    mutate(Week = as.numeric(substring(AdjustedID, 2, 5))) %>%
+    mutate(Ntlen =as.numeric( as.character(Ntlen)))
+  
+  return(nt_table2)
+}
+
+
+process_IGH_data(IGH_data2, "3'V-REGION") %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()
+```
+
+```{r}
+process_IGH_data(IGH_data2, "5'J-REGION") %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()
+```
+
+```{r}
+CDRlocus="N-REGION"
+process_IGH_data(IGH_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()+ggtitle(CDRlocus)
+IGH_data2[,c( "ntlen", "AdjustedID")]
+```
+
+```{r}
+CDRlocus="N1-REGION"
+process_IGH_data(IGH_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(paste0("IGH ",CDRlocus))
+```
+
+```{r}
+CDRlocus="N-REGION"
+process_IGH_data(IGH_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()+ggtitle(CDRlocus)
+```
+
+```{r}
+CDRlocus="N1-REGION"
+PN1=process_IGH_data(IGH_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGH  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+PN1
+# ggsave(paste0("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/",Celltype," ",CDRlocus,".pdf"))
+```
+```{r}
+CDRlocus="N2-REGION"
+PN2=process_IGH_data(IGH_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGH  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+PN2
+```
+```{r}
+CDRlocus="3'V-REGION"
+P3V=process_IGH_data(IGH_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGH  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+P3V
+```
+
+```{r}
+CDRlocus="5'J-REGION"
+P5J=process_IGH_data(IGH_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGH  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+P5J
+```
+```{r}
+CDRlocus="D-REGION"
+PD=process_IGH_data(IGH_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGH  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+PD
+```
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+
+Pall=grid.arrange(P3V,PN1, PD,PN2,P5J, ncol = 1)
+Pall
+ggsave(plot = Pall,"IMGT202403/IGHJ6_CDR3part.pdf", width = 6, height = 20, dpi = 300)
+```
+```{r}
+source('/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/Mainrun.R')
+PXP=Immue_sigplot_General(IGH_data2, c("N1-REGION", "N2-REGION", "3'V-REGION", "5'J-REGION", "D-REGION"),process_IGH_data,
+                         "/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure4/S24sig/AllIGH6sig.pdf")
+```
+```{r}
+PXP
+```
+

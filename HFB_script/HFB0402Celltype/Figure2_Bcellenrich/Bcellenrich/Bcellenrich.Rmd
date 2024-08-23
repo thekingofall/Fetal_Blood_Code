@@ -1,0 +1,36 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-01-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+daga=read.csv("/home/maolp/Allcount/All_scanpyData/Bdata/Bdfall.csv")
+```
+
+
+```{r}
+source("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/util.R")
+
+```
+```{r}
+golist=list()
+for (i in unique(daga$group)) {
+  data=subset(daga,group==i)
+  golist[[i]]=perform_enrichment_analysis(data)
+}
+```
+
+```{r}
+dotplot(golist[[1]]$GO,showCategory = 20)
+# ??dotplot
+```
+
+```{r}
+dotplot(golist[[2]]$GO)
+```
+

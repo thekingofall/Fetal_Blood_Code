@@ -1,0 +1,321 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-11-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+```{r}
+system("mkdir -p /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30")
+# system("mkdir -p /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S23")
+# system("mkdir -p /home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S24")
+```
+
+
+```{r}
+library(data.table)
+library(tidyverse)
+```
+
+```{r}
+BCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount//All_scanpyData/Data/BCRobs.csv")
+BCRobs
+```
+
+
+
+```{r}
+library(data.table)
+library(tidyverse)
+```
+
+
+
+```{r}
+BCRobs<-BCRobs[grep("PBMC",BCRobs$New_Body),]
+```
+
+
+```{r}
+read_and_assign <- function(folder) {
+  file_path <- paste0("IMGT_HighV-QUEST/",folder, "/6_Junction.txt")
+  # print(file_path)
+  assign(paste0(folder, "_data"), fread( file_path ,header = T), envir = .GlobalEnv)
+}
+
+
+folders <- c("IGH", "IGK", "IGK")
+
+
+lapply(folders, read_and_assign)
+```
+```{r}
+colnames(IGK_data)
+IGK_data
+# IGK_data$`V-DOMAIN ID`<-
+```
+
+```{r}
+BCRobs$VID<-paste0(BCRobs$Cellname)
+IGK_data2<-merge(IGK_data,BCRobs,by.x="Sequence ID",by.y="VID")
+IGK_data2$ntlen=nchar(IGK_data2$JUNCTION)
+IGK_data2$Week<-substring(IGK_data2$AdjustedID,2,5) %>% as.numeric()
+IGK_ntlen=IGK_data2[,c("Week","ntlen","AdjustedID")]
+IGKnttable=table(IGK_ntlen$AdjustedID,IGK_ntlen$ntlen) %>% as.data.frame()
+colnames(IGKnttable)<-c("AdjustedID","Ntlen","Freq")
+IGKnttable2=IGKnttable %>%
+  group_by(AdjustedID,Ntlen) %>%
+  summarise(Freq_sum = sum(Freq)) %>%
+  mutate(Freq_ratio = Freq_sum / sum(Freq_sum)) %>% mutate(Week=as.numeric(substring(AdjustedID,2,5)))%>%mutate(Ntlen=as.character(Ntlen))
+```
+
+```{r}
+ggplot(IGKnttable2)+geom_point(aes(as.numeric(Ntlen),Freq_ratio,color=Week))+geom_smooth(aes(as.numeric(Ntlen),Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()
+```
+```{r}
+process_IGK_data <- function(IGK_data, junction_field) {
+  data <- IGK_data
+  data$ntlen <- nchar(data[[junction_field]])
+
+  data_sub <- data[, c( "ntlen", "AdjustedID")]
+  nt_table <- table(data_sub$AdjustedID, data_sub$ntlen) %>% as.data.frame()
+  print("test")
+  colnames(nt_table) <- c("AdjustedID", "Ntlen", "Freq")
+  print("test2")
+  nt_table2 <- nt_table %>%
+    group_by(AdjustedID, Ntlen) %>%
+    summarise(Freq_sum = sum(Freq)) %>%
+    mutate(Freq_ratio = Freq_sum / sum(Freq_sum)*100) %>%
+    mutate(Week = as.numeric(substring(AdjustedID, 2, 5))) %>%
+    mutate(Ntlen =as.numeric( as.character(Ntlen)))
+  
+  return(nt_table2)
+}
+
+
+process_IGK_data(IGK_data2, "3'V-REGION") %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()
+```
+
+```{r}
+# process_IGK_data(IGK_data2, "5'J-REGION") %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()
+# 
+# ggsave("PDF/IGK5Jregion.pdf")
+```
+
+
+
+```{r}
+CDRlocus="N-REGION"
+process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(CDRlocus)+ggtitle(paste0("IGK ",CDRlocus))
+# ggsave("PDF/IGK5Jregion.pdf")
+```
+
+```{r}
+# CDRlocus="N1-REGION"
+# process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(CDRlocus)
+```
+
+```{r}
+CDRlocus="N-REGION"
+process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(paste0("IGK ",CDRlocus))
+```
+
+
+```{r}
+# CDRlocus="N2-REGION"
+# process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(CDRlocus)
+```
+```{r}
+CDRlocus="3'V-REGION"
+process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(paste0("IGK ",CDRlocus))
+```
+
+```{r}
+CDRlocus="5'J-REGION"
+process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(paste0("IGK ",CDRlocus))
+```
+
+```{r}
+process_IGK_data(IGK_data2, "5'J-REGION") %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()
+```
+
+
+
+```{r}
+CDRlocus="N-REGION"
+process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()+ggtitle(CDRlocus)
+IGK_data2[,c( "ntlen", "AdjustedID")]
+```
+
+```{r}
+# CDRlocus="N1-REGION"
+# process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_c()+theme_classic()+ggtitle(paste0("IGK ",CDRlocus))
+```
+
+```{r}
+# CDRlocus="N-REGION"
+# process_IGK_data(IGK_data2,CDRlocus ) %>% ggplot()+geom_point(aes(Ntlen,Freq_ratio,color=Week))+geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F)+scale_color_viridis_b()+theme_classic()+ggtitle(CDRlocus)
+```
+
+```{r}
+Celltype="All IGK"
+```
+
+```{r}
+CDRlocus="N-REGION"
+PN=process_IGK_data(IGK_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGK  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+ggsave(plot = PN,paste0("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/",Celltype," ",CDRlocus,".pdf"))
+```
+```{r}
+CDRlocus="3'V-REGION"
+P3V=process_IGK_data(IGK_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGK  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+ggsave(plot=P3V,paste0("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/",Celltype," ",CDRlocus,".pdf"))
+```
+
+```{r}
+CDRlocus="5'J-REGION"
+P5J=process_IGK_data(IGK_data2,CDRlocus ) %>% 
+  ggplot()+
+  geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+  geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+  scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+  theme_classic()+
+  ggtitle(paste0("IGK  ",CDRlocus))+
+  theme_linedraw() +
+  xlab('Length(nt)') +
+  ylab('ratio(%)') +
+  theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+       panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+  labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+ggsave(plot = P5J,paste0("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/",Celltype," ",CDRlocus,".pdf"))
+```
+```{r}
+# CDRlocus="D-REGION"
+# process_IGK_data(IGK_data2,CDRlocus ) %>% 
+#   ggplot()+
+#   geom_point(aes(Ntlen,Freq_ratio,color=Week),shape=1)+
+#   geom_smooth(aes(Ntlen,Freq_ratio,group=Week,color=Week),se=F,size=0.3)+
+#   scale_color_viridis_c(breaks = c(10, 20,  30, 39))+
+#   theme_classic()+
+#   ggtitle(paste0("IGK  ",CDRlocus))+
+#   theme_linedraw() +
+#   xlab('Length(nt)') +
+#   ylab('ratio(%)') +
+#   theme(plot.title = element_text(hjust = 0.5, size = 13, face = "bold"),
+#        panel.border = element_rect(linetype = "solid", colour = "black", size = 1.5))+
+#   labs(color="pcw")+scale_color_gradientn(colours = rev(colorRampPalette(c("#C71000B2","#FF6F00B2","#6a73cf","#00AF99" ))(100)))
+# ggsave(paste0("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30/",Celltype," ",CDRlocus,".pdf"))
+```
+
+
+
+```{r}
+
+
+process_IGK_data2 <- function(IGK_data, junction_field) {
+  data <- IGK_data
+  data$ntlen <- nchar(data[[junction_field]])
+
+  data_sub <- data[, c( "ntlen", "AdjustedID")]
+  nt_table <- table(data_sub$AdjustedID, data_sub$ntlen) %>% as.data.frame()
+  # print("test")
+  colnames(nt_table) <- c("AdjustedID", "Ntlen", "Freq")
+  # print("test2")
+  nt_table2 <- nt_table %>%
+    group_by(AdjustedID, Ntlen) %>%
+    summarise(Freq_sum = sum(Freq)) %>%
+    mutate(Freq_ratio = Freq_sum / sum(Freq_sum)*100) %>%
+    mutate(Week = as.numeric(substring(AdjustedID, 2, 5))) %>%
+    mutate(Ntlen =as.numeric( as.character(Ntlen)))
+  nt_table2$Alen=paste0(junction_field,"_",nt_table2$Ntlen)
+  return(nt_table2)
+}
+# CDRlocus="D-REGION"
+# 
+# DREGION=process_IGK_data2(IGK_data2,CDRlocus )
+
+Dall=data.frame()
+for (i in c("N-REGION","5'J-REGION","3'V-REGION")) {
+  tem=process_IGK_data2(IGK_data2,i )
+  Dall=rbind(Dall,tem)
+}
+```
+
+```{r}
+head(Dall)
+Dall2=Dall[,c("AdjustedID","Alen","Freq_ratio")]
+
+Dall2_wide <- Dall2 %>% 
+  pivot_wider(names_from = Alen, values_from = Freq_ratio)
+
+Dall2_wide <- spread(Dall2, Alen, Freq_ratio) %>% as.data.frame()
+rownames(Dall2_wide)<-Dall2_wide$AdjustedID
+Dall2_wide<-Dall2_wide[,-1]
+```
+
+```{r}
+library(factoextra)
+Dall2_pca <- prcomp(Dall2_wide)
+
+fviz_pca_ind(Dall2_pca  , repel=T)
+```
+
+```{r}
+
+groups=c(rep("Early PBMC",11),rep("Late PBMC",10))
+P1=fviz_pca_ind(Dall2_pca,
+             col.ind = groups, # color by groups
+             palette =c('#7570b3','red'),
+             addEllipses = TRUE, # Concentration ellipses
+             ellipse.type = "confidence",
+             legend.title = "Groups",title='TCR IGK CDR3 5V+N1+D+N2+5J Percentage length(nt) PCA',
+             repel = TRUE,ggtheme = theme_classic()
+             )+theme(aspect.ratio = 1)
+P1
+```
+```{r}
+IGKmain=P1$data
+IGKmain$Week<-substring(IGKmain$name,2,5) %>% as.numeric()
+IGKmain$Week=IGKmain$Week
+ggplot(IGKmain)+geom_point(aes(x,y=y,color=Week),size=3)+theme_classic()+scale_colour_viridis_c()+xlab("Dim1(92.6%)")+ylab("Dim2(3.1%)")+theme(aspect.ratio = 1)
+```
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+
+Pall=grid.arrange(P3V, PN,P5J, ncol = 1)
+
+ggsave(plot=Pall,"/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure5/S30//IGK.pdf", width = 6, height = 10, dpi = 300)
+```
+

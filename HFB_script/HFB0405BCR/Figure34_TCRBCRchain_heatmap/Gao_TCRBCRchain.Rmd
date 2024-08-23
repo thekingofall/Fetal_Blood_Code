@@ -1,0 +1,314 @@
+---
+title: "Untitled"
+author: "MLP"
+date: "2023-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list=ls())
+```
+
+```{r}
+TCRH_chainlong=read.csv("/home/maolp/Allcount/All_scanpyData/TCRchain/TCRH_chainlong.csv")
+```
+
+```{r}
+TRBVlist_values<-read.csv("TCRBCRchain200/TRBVlist_values.csv",header = T)
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer )
+library(ComplexHeatmap)
+TCRH=TCRH_chainlong
+```
+
+
+```{r}
+TCRH$variable<-factor(TCRH$variable,level=TRBVlist_values$x)
+
+library(dplyr)
+
+
+
+split_TCRH<- strsplit(TCRH$Sample, "_")
+
+
+TCRH$CellType <- sapply(split_TCRH, "[", 1)
+TCRH$AdjusteID<- sapply(split_TCRH, "[", 2)
+
+TCRH$Organ <- substr(TCRH$AdjusteID, 1, 1)
+TCRH$Sample<-factor(TCRH$Sample,level=rev(sort(unique(TCRH$Sample))))
+TCRH2 <- TCRH %>% group_by(variable) %>% filter(sum(as.numeric(value) )!= 0) %>%ungroup()
+TCRH2$Week<-substring(TCRH2$AdjusteID,2,5) %>% as.numeric()
+TCRH2$Stage<-ifelse(TCRH2$Week<=28,'Early','Late')
+
+
+library(dplyr)
+
+TCRH2 <- TCRH2 %>% 
+  mutate(Organ = case_when(
+    Organ == "B" ~ "PBMC",
+    Organ == "L" ~ "Liver",
+    Organ == "S" ~ "Spleen",
+    Organ == "T" ~ "Thymus",
+    TRUE ~ Organ  
+  ))
+TCRH2$Organ_Stage=paste0(TCRH2$Stage,'_',TCRH2$Organ)
+```
+```{r}
+subset(TCRH2,CellType=="Naïve CD4 T")
+```
+
+```{r}
+P2=subset(TCRH2,CellType=="Naïve CD4 T") %>% ggplot()+geom_boxplot(aes(variable,value,fill=Organ_Stage))+ theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        legend.position = "none") +  
+
+ 
+  xlab("")+labs(color="Cell_type")
+```
+```{r}
+# 进行ANOVA分析
+res.aov <- aov(value ~ Organ_Stage, data = subset(TCRH2,CellType=="Naïve CD4 T"))
+
+summary(res.aov)
+```
+```{r}
+unique(TCRH2$Organ_Stage)
+```
+```{r}
+intersect(c("Early_PBMC", "Late_PBMC","Early_Spleen","Early_Thymus","Early_Liver"),unique(TCRH2$Organ_Stage))
+```
+```{r}
+TCRH2$Organ_Stage<-factor(TCRH2$Organ_Stage,levels = c("Early_PBMC"  , "Late_PBMC",  "Early_Liver", "Early_Thymus" ,  "Early_Spleen" ))
+```
+
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(TCRH2, CellType == "Naïve CD4 T")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P2=subset(TCRH2,CellType=="Naïve CD4 T") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD4')+scale_fill_npg()
+ P2
+ ggsave(plot = P2,'Gao_TCRBCRchain_Figure/CD4TCRB.pdf',width = 20,height = 40)
+```
+```{r}
+# ggsave(plot =  P28,'Gao_TCRBCRchain_Figure/P28.pdf',width = 20,height = 40)
+```
+```{r}
+unique(TCRH2$Organ_Stage)
+```
+
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P281=subset(TCRH2,CellType=="Naïve CD8 T")%>%subset(Organ_Stage=="Early_PBMC"|Organ_Stage=="Late_PBMC") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(~variable, scales = "free", space='free') +  
+  theme_minimal() +
+  theme(
+    # panel.grid = element_blank(), 
+        # panel.background = element_blank(), 
+        # panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+       ) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD4')+scale_fill_npg()
+ P281
+```
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P282=subset(TCRH2,CellType=="Naïve CD8 T")%>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_bar(stat = 'identity',position = "dodge")+ 
+  # theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ # facet_grid(~variable, scales = "free", space='free') +  
+  theme_classic() +
+  theme(
+    # panel.grid = element_blank(), 
+        panel.background = element_blank(),
+        # panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+       ) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD8')+scale_fill_npg()
+ P282
+```
+
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P284=subset(TCRH2)%>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_bar(stat = 'identity',position = "dodge")+ 
+  # theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(CellType~variable, scales = "free", space='free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))+xlab("")+ylab("Composition (%)")+scale_fill_npg()
+ P284
+```
+```{r}
+# First, calculate mean and se for each group
+data_summary <- TCRH2 %>%
+  group_by(CellType, variable, Organ_Stage) %>%
+  summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+
+# Define dodge width
+dodge <- position_dodge(width = 0.9)
+
+# Then plot
+P284 <- ggplot(data_summary, aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+  geom_bar(stat = "identity", position = dodge) +
+  geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+  stat_compare_means(data = data_summary, comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(CellType ~ variable, scales = "free", space = 'free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        strip.text.x =  element_blank()) + # Remove facet labels
+  xlab("") +
+  ylab("Composition (%)") +
+  scale_fill_npg()
+
+P284
+```
+
+
+```{r}
+P28=subset(TCRH2,CellType=="Naïve CD8 T") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD4')+scale_fill_npg()
+ P28
+```
+```{r}
+ggsave(plot =  P28,'Gao_TCRBCRchain_Figure/CD8TCRB.pdf',width = 20,height = 40)
+```
+
+```{r}
+subset(TCRH2,CellType=="Naïve CD4 T")
+```
+```{r}
+
+```
+
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"))
+P6=subset(TCRH2,CellType=="Naïve CD4 T") %>% subset(Organ_Stage=="Early_PBMC"|Organ_Stage=="Late_PBMC") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(.~variable, scales = "free",space = "free",switch = "y") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD4')+scale_fill_npg()
+P6
+```
+
+
+
+```{r}
+
+P3=subset(TCRH2,CellType=="Naïve CD4 T") %>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ # facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'TRB_ratio in CD4')+scale_fill_npg()
+P3
+```
+```{r}
+ggsave(plot = P284,"Gao_TCRBCRchain_Figure/TCRB_merge.pdf",width = 30,height = 10)
+```
+

@@ -1,0 +1,247 @@
+---
+title: "Untitled"
+author: "MLP"
+date: "2023-09-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+BCRH_chainlong=read.csv("TCRBCRchain200/BCRH_chainlong.csv")
+```
+
+```{r}
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer )
+library(ComplexHeatmap)
+BCRH=BCRH_chainlong
+```
+
+```{r}
+BCRHVlist_values<-read.csv("TCRBCRchain200/IGHlistvalues.csv")
+```
+
+```{r}
+BCRH$variable<-factor(BCRH$variable,level=BCRHVlist_values$x)
+```
+
+
+```{r}
+library(dplyr)
+
+
+
+split_BCRH<- strsplit(BCRH$Sample, "_")
+
+
+BCRH$CellType <- sapply(split_BCRH, "[", 1)
+BCRH$AdjusteID<- sapply(split_BCRH, "[", 2)
+
+BCRH$Organ <- substr(BCRH$AdjusteID, 1, 1)
+BCRH$Sample<-factor(BCRH$Sample,level=rev(sort(unique(BCRH$Sample))))
+BCRH2 <- BCRH %>% group_by(variable) %>% filter(sum(as.numeric(value) )!= 0) %>%ungroup()
+BCRH2$Week<-substring(BCRH2$AdjusteID,2,5) %>% as.numeric()
+BCRH2$Stage<-ifelse(BCRH2$Week<=28,'Early','Late')
+
+
+library(dplyr)
+
+BCRH2 <- BCRH2 %>% 
+  mutate(Organ = case_when(
+    Organ == "B" ~ "PBMC",
+    Organ == "L" ~ "Liver",
+    Organ == "S" ~ "Spleen",
+    Organ == "T" ~ "Thymus",
+    TRUE ~ Organ  
+  ))
+BCRH2$Organ_Stage=paste0(BCRH2$Stage,'_',BCRH2$Organ)
+```
+```{r}
+BCRH2$Organ_Stage<-factor(BCRH2$Organ_Stage,levels = c("Early_PBMC"  , "Late_PBMC",  "Early_Liver", "Early_Thymus" ,  "Early_Spleen" ))
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(BCRH2, CellType == "IGKC+Naïve B")
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  c("Late_PBMC", "Early_Liver"),
+  c("Late_PBMC", "Early_Spleen"),
+  c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+P2A=subset(BCRH2,CellType=="IGKC+Naïve B") %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'BCRH_ratio in IGKC+Naïve B')+scale_fill_npg()
+ P2A
+ ggsave(plot = P2A,'Gao_TCRBCRchain_Figure/IGKCposNaïveBBCRH.pdf',width = 20,height = 40)
+```
+```{r}
+library(dplyr)
+library(purrr)
+library(ggpubr)
+library(ggsci)
+# Subset the data
+data_subset <- subset(BCRH2, CellType == "IGKC-Naïve B")
+```
+
+
+```{r}
+my_comparisons <- list(
+  # c("Early_PBMC", "Late_PBMC"),
+  c("Early_PBMC", "Early_Liver"),
+  c("Early_PBMC", "Early_Spleen"),
+  c("Early_PBMC", "Early_Thymus"),
+  # c("Late_PBMC", "Early_Liver"),
+  # c("Late_PBMC", "Early_Spleen"),
+  # c("Late_PBMC", "Early_Thymus"),
+  c("Early_Liver", "Early_Spleen"),
+  c("Early_Liver", "Early_Thymus"),
+  c("Early_Spleen", "Early_Thymus")
+)
+```
+
+```{r}
+BCRH3<-subset(BCRH2,Organ_Stage!="Late_PBMC")
+```
+
+```{r}
+P8A=subset(BCRH3) %>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free", labeller = label_both) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'BCRH_ratio in IGKC-Naïve B')+scale_fill_npg()
+
+ ggsave(plot = P8A,'BCRH.pdf',width = 20,height = 40)
+```
+
+
+
+
+```{r}
+BCRH4<-subset(BCRH3,BCRH3$variable %in% c("IGHV-66","IGHV3-64","IGHV4-59","IGHV1-58","IGHV3-49","IGHV3-48","IGHV1-45","IGHV3-20","IGHV3-9","IGHV2-5","IGHV3-72"))
+PBCRH<-BCRH4%>% ggplot(aes(Organ_Stage,value,fill=Organ_Stage))+geom_boxplot(position = position_dodge(width = 1), outlier.size = 0.7, width = 0.1, show.legend = FALSE, color = "black")+ 
+  theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_wrap(~variable, scales = "free",ncol = 10) +  
+  theme_minimal() +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(), 
+        legend.key = element_blank()) +
+  labs(x = '', y = '', title = 'BCRH in Early Organ')+scale_fill_npg()
+PBCRH
+ggsave(plot = PBCRH,"PBCRH.pdf",width = 20,height = 5)
+```
+
+
+```{r}
+my_comparisons <- list(
+  c("Early_PBMC", "Late_PBMC")
+ 
+)
+P283=subset(BCRH2)%>% ggplot(aes(variable,value,fill=Organ_Stage))+geom_bar(stat = 'identity',position = "dodge")+ 
+  # theme_bw(base_size = 16) + 
+stat_compare_means(comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+ facet_grid(CellType~variable, scales = "free", space='free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))+xlab("")+ylab("Composition (%)")+scale_fill_npg()
+ P283
+```
+```{r}
+
+```
+
+```{r}
+# BCRH2$value %>% 
+```
+
+```{r}
+# First, calculate mean and se for each group
+data_summary <- BCRH2 %>%
+  group_by(CellType, variable, Organ_Stage) %>%
+  summarise(mean_value = mean(value), se = sd(value) / sqrt(n()), .groups = 'drop')
+
+# Define dodge width
+dodge <- position_dodge(width = 0.9)
+
+# Then plot
+P284 <- ggplot(data_summary, aes(x = variable, y = mean_value, fill = Organ_Stage)) +
+  geom_bar(stat = "identity", position = dodge) +
+  geom_errorbar(aes(ymin = mean_value - se, ymax = mean_value + se), width = 0.6, position = dodge) +
+  stat_compare_means(data = data_summary, comparisons = my_comparisons, label = "p.signif", tip.length = 0) +
+  facet_grid(CellType ~ variable, scales = "free", space = 'free', switch = "y") +
+  theme_classic() +
+  theme_bw(base_size = 16) +
+  theme(panel.grid = element_blank(), 
+        panel.background = element_blank(), 
+        panel.border = element_blank(),
+        axis.line = element_line(color = "black"),
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+        axis.text.y = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        strip.text.x =  element_blank()) + # Remove facet labels
+  xlab("") +
+  ylab("Composition (%)") +
+  scale_fill_npg()
+
+P284
+```
+```{r}
+ggsave(plot=P284,"Gao_TCRBCRchain_Figure/BCRH_merge.pdf",width = 30,height = 10)
+```
+
+

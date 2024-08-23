@@ -1,0 +1,66 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-03-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+extract_sequence <- function(x) {
+  start_pos <- gregexpr("\\|", x)[[1]][1] + 1
+  end_pos <- gregexpr(" ", x)[[1]][1] - 1
+  substr(x, start_pos, end_pos)
+}
+
+```
+
+
+```{r}
+
+library(Biostrings)
+
+
+IGHDfasta_file <- "/home/maolp/mao/Ref/refdata-cellranger-vdj-GRCh38-alts-ensembl-7.0.0/fasta/IGHD.fa"
+IGHDsequences <- readDNAStringSet(IGHDfasta_file)
+
+
+IGHDsequence_lengths <- width(IGHDsequences)
+
+
+IGHDresult <- data.frame(
+  sequence_name = names(IGHDsequences),
+  length = IGHDsequence_lengths
+
+print(IGHDresult)
+```
+```{r}
+library(Biostrings)
+
+
+IGHJfasta_file <- "/home/maolp/mao/Ref/refdata-cellranger-vdj-GRCh38-alts-ensembl-7.0.0/fasta/IGHJ.fa"
+IGHJsequences <- readDNAStringSet(IGHJfasta_file)
+
+
+IGHJsequence_lengths <- width(IGHJsequences)
+
+
+IGHJresult <- data.frame(
+sequence_name = names(IGHJsequences),
+length = IGHJsequence_lengths)
+extract_sequence(IGHJresult$sequence_name)
+print(IGHJresult)
+```
+
+```{r}
+
+
+
+sequences <- unlist(sapply(IGHDresult$sequence_name, extract_sequence))
+
+
+print(sequences)
+IGHDresult$sequence_name<-sequences
+```
+

@@ -1,0 +1,161 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-11-15"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+BCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/BCRobs.csv")
+BCRobs
+```
+```{r}
+colnames(BCRobs)
+```
+
+```{r}
+# %%R -w 500 -h 300 
+
+BCRdir="/data1/maolp/Rstudy/GaofengSinglecell/Gaofeng_All_matrix/Allcount/BCR_all/"
+BCRsamples=list.files(path = BCRdir,"csv")
+AllBCR=data.frame()
+for (line in BCRsamples) {
+#   print(line)
+  name=gsub("_BCR_filtered_contig_annotations.csv","",line)
+  # print(name)
+  if (!name %in% c("Z28")){
+     Test_BCR<-read.csv(file.path(BCRdir,line))
+     Test_BCR$barcodename=paste0(name,"_",Test_BCR$barcode)
+     Test_BCR$Group<-name
+     AllBCR=rbind(AllBCR,Test_BCR)
+  }
+ 
+}
+# head(AllBCR)
+```
+
+```{r}
+MainBCR=AllBCR[AllBCR$barcodename %in% BCRobs$Cellname,]
+BCRH<-MainBCR[grep("IGH",MainBCR$chain),]
+BCRH<-BCRH[!duplicated(BCRH$barcodename),]
+
+BCRH$mainseq=paste0(BCRH$fwr1_nt,BCRH$cdr1_nt,BCRH$fwr2_nt,BCRH$cdr2_nt,BCRH$fwr3_nt,BCRH$cdr3_nt,BCRH$fwr4_nt)
+```
+
+```{r}
+MainIGL=AllBCR[AllBCR$barcodename %in% BCRobs$Cellname,]
+IGL<-MainIGL[grep("IGL",MainIGL$chain),]
+IGL<-IGL[!duplicated(IGL$barcodename),]
+
+IGL$mainseq=paste0(IGL$fwr1_nt,IGL$cdr1_nt,IGL$fwr2_nt,IGL$cdr2_nt,IGL$fwr3_nt,IGL$cdr3_nt,IGL$fwr4_nt)
+library(Biostrings)
+
+
+IGLdna_strings <- DNAStringSet(IGL$mainseq)
+names(IGLdna_strings) <- IGL$barcodename
+
+writeXStringSet(IGLdna_strings, "Fasta/IGL_CDR3output.fasta")
+```
+```{r}
+MainIGK=AllBCR[AllBCR$barcodename %in% BCRobs$Cellname,]
+IGK<-MainIGK[grep("IGK",MainIGK$chain),]
+IGK<-IGK[!duplicated(IGK$barcodename),]
+
+IGK$mainseq=paste0(IGK$fwr1_nt,IGK$cdr1_nt,IGK$fwr2_nt,IGK$cdr2_nt,IGK$fwr3_nt,IGK$cdr3_nt,IGK$fwr4_nt)
+library(Biostrings)
+
+
+IGKdna_strings <- DNAStringSet(IGK$mainseq)
+names(IGKdna_strings) <- IGK$barcodename
+
+writeXStringSet(IGKdna_strings, "Fasta/IGK_CDR3output.fasta")
+```
+
+
+```{r}
+library(Biostrings)
+
+
+Bdna_strings <- DNAStringSet(BCRH$mainseq)
+names(Bdna_strings) <- BCRH$barcodename
+
+writeXStringSet(Bdna_strings, "Fasta/IGH_CDR3output.fasta")
+```
+### TCR
+
+```{r}
+TCRdir="/data1/maolp/Rstudy/GaofengSinglecell/Gaofeng_All_matrix/Allcount/TCR_all/"
+TCRsamples=list.files(path = TCRdir,"csv")
+AllTCR=data.frame()
+for (line in TCRsamples) {
+#   print(line)
+  name=gsub("_TCR_filtered_contig_annotations.csv","",line)
+  # print(name)
+  if (!name %in% c("C27","Z28")){
+     Test_TCR<-read.csv(file.path(TCRdir,line))
+     Test_TCR$barcodename=paste0(name,"_",Test_TCR$barcode)
+     Test_TCR$Group<-name
+     AllTCR=rbind(AllTCR,Test_TCR)
+  }
+ 
+}
+head(AllTCR)
+# AllTCR
+```
+
+
+```{r}
+# Celltype="All TRA"
+TCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/TCRobs.csv")
+TCRobs
+```
+
+```{r}
+MainTCR=AllTCR[AllTCR$barcodename %in% TCRobs$Cellname,]
+TRB<-MainTCR[grep("TRB",MainTCR$chain),]
+TRB<-TRB[!duplicated(TRB$barcodename),]
+
+TRB$mainseq=paste0(TRB$fwr1_nt,TRB$cdr1_nt,TRB$fwr2_nt,TRB$cdr2_nt,TRB$fwr3_nt,TRB$cdr3_nt,TRB$fwr4_nt)
+
+library(Biostrings)
+
+
+TRBdna_strings <- DNAStringSet(TRB$mainseq)
+names(TRBdna_strings) <- TRB$barcodename
+
+
+writeXStringSet(TRBdna_strings, "Fasta/TRB_CDR3output.fasta")
+```
+
+
+```{r}
+MainTCR=AllTCR[AllTCR$barcodename %in% TCRobs$Cellname,]
+TRA<-MainTCR[grep("TRA",MainTCR$chain),]
+TRA<-TRA[!duplicated(TRA$barcodename),]
+
+TRA$mainseq=paste0(TRA$fwr1_nt,TRA$cdr1_nt,TRA$fwr2_nt,TRA$cdr2_nt,TRA$fwr3_nt,TRA$cdr3_nt,TRA$fwr4_nt)
+
+library(Biostrings)
+
+
+TRAdna_strings <- DNAStringSet(TRA$mainseq)
+names(TRAdna_strings) <- TRA$barcodename
+
+
+writeXStringSet(TRAdna_strings, "Fasta/TRA_CDR3output.fasta")
+
+```
+
+
+
+
+
+
+

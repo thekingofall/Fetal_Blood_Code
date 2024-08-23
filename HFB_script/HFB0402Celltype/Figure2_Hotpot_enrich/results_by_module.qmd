@@ -1,0 +1,276 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+results_by_module=readRDS('/home/maolp/data5/Gaofeng_All_matrix/Allcount//All_scanpyData/Last_Hotspot/Go_results_by_module.RDS')
+allmods=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/Last_Hotspot/HotspotvargeneKEY_all_mods.csv")
+
+```
+
+```{r}
+library(tidyverse)
+
+table(allmods$Module)%>% as.data.frame()-> modegene
+modegene$Var2<-factor(paste0('module',modegene$Var1),level=paste0('module',modegene$Var1))
+
+vlines <- 0.5 + seq_len(nlevels(factor(modegene$Var1))) 
+print(vlines)
+ggplot( modegene)+geom_col(aes(Var2,Freq),fill="black")+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank())+ylab('Gene Number')+xlab("")
+```
+
+```{r}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(dplyr)
+```
+
+```{r}
+top_paths <- lapply(results_by_module, function(x) {
+  
+    # x1=filter(x,ONTOLOGY=="BP")
+    top10<- arrange(x,p.adjust) %>%head(2)
+
+ return(top10)
+})
+
+# 将结果转换为数据框
+top_paths_df <- do.call(rbind, top_paths)
+top_paths_df$Label <- rep(names(top_paths), sapply(top_paths, nrow))
+
+# 输出结果
+# results_by_module
+head(top_paths_df)
+```
+
+```{r}
+write.csv(top_paths_df,"top_paths_df.csv")
+```
+
+```{r}
+
+numeric_levels <- as.numeric(gsub("Module-", "", levels(factor(top_paths_df$Label))))
+
+
+sorted_levels <- paste("Module", 1:50, sep = "-")
+
+
+top_paths_df$Label <- factor(top_paths_df$Label, levels = sorted_levels)
+top_paths_df$Description<-factor(top_paths_df$Description, levels = unique(top_paths_df$Description))
+
+head(top_paths_df)
+top_paths_df$Label
+```
+
+```{r}
+library(ggsci)
+P1=ggplot() +geom_tile(data = top_paths_df, aes(x = Description, y = Label),fill='white',color='black')+
+  geom_point(data = top_paths_df, aes(x = Description, y = Label, size = Count,color=p.adjust)) +theme_bw()+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+) +
+  xlab('') +
+  ylab('')+scale_color_gradientn(colors = c("#F6313E", "#00AF99", "#6a73cf",'white'), values = c(0, 0.01, 0.05,0.1))
+P1
+# ggsave(plot = P1,'Hotspot_GO.pdf',width = 9,height = 9)
+```
+
+```{r}
+ggsave(plot=P1,'P1.pdf',width = 16,height = 8)
+```
+
+```{r}
+gsub(".*-", "", top_paths_df$Label)
+```
+
+```{r}
+library(ggplot2)
+library(ggsci)
+
+library(ggplot2)
+library(ggsci)
+
+
+P1 <- ggplot() +
+  # geom_tile(data = top_paths_df, aes(x = Description, y = Label), fill = 'white', color = 'black') +
+  geom_point(data = top_paths_df, aes(x = Description, y = Label, size = Count, color = p.adjust)) +
+  # geom_text(data = top_paths_df, aes(x = Description, y = Label, label = gsub(".*-", "", Label), size = 4)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  xlab('') +
+  ylab('') +
+  scale_color_gradientn(colors = c("#F6313E", "#00AF99", "#6a73cf", 'white'), values = c(0, 0.01, 0.05, 0.1))
+
+P1
+```
+
+```{r}
+background_df
+```
+
+```{r}
+
+```
+
+```{r}
+top<-read.csv("Module_meta_enrich.csv")
+top$seq=gsub("Module-","",top$Label) %>% as.numeric()
+top<-arrange(top,seq)
+# s1$pvalue<--log(s1$pvalue)
+```
+
+```{r}
+background_df2 
+```
+
+```{r}
+top_paths_df
+```
+
+```{r}
+table(top$seq)
+```
+
+```{r}
+# 创建一个包含所有组合的数据框
+background_df2 <- expand.grid(
+  Description = unique(top$Description),
+  Label = unique(top$Label)
+)
+
+# 添加一个用于填充的变量
+background_df2$fill <- (1:nrow(background_df2)) %% 2
+# 计算每个Label的编号，将其作为填充色的依据
+background_df2$fill <- as.numeric(as.factor(background_df2$Description)) %% 2
+
+P1=ggplot() +
+  geom_tile(data = background_df2, aes(x = Description, y = Label, fill = as.factor(fill)), alpha = 0.5) +
+  scale_fill_manual(values = c("white", "gray"), guide = FALSE) +
+  geom_point(data = top, aes(x = Description, y = Label, size = Count), color="red") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  xlab('') +
+  ylab('')+coord_flip()
+P1
+```
+
+```{r}
+background_df
+```
+
+```{r}
+library(ggplot2)
+
+
+# 创建一个包含所有组合的数据框
+background_df <- expand.grid(
+  Description = unique(top_paths_df$Description),
+  Label = unique(top_paths_df$Label)
+)
+
+# 添加一个用于填充的变量
+background_df$fill <- (1:nrow(background_df)) %% 2
+
+
+# 创建图形
+P1=ggplot() +
+  geom_tile(data = background_df, aes(x = Description, y = Label, fill = as.factor(fill)), alpha = 0.5) +
+  scale_fill_manual(values = c("white", "gray")) +
+  geom_point(data = top_paths_df, aes(x = Description, y = Label, size = Count),color="red") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  xlab('') +
+  ylab('')+coord_flip()
+P1
+```
+
+```{r}
+library(ggplot2)
+library(ggplot2)
+
+library(ggplot2)
+
+# 创建一个包含所有组合的数据框
+background_df <- expand.grid(
+  Description = unique(top_paths_df$Description),
+  Label = unique(top_paths_df$Label)
+)
+
+# 添加一个用于填充的变量
+background_df$fill <- (1:nrow(background_df)) %% 2
+
+
+# 创建图形
+P1=ggplot() +
+  geom_tile(data = background_df, aes(x = Description, y = Label, fill = as.factor(fill)), alpha = 0.5) +
+  scale_fill_manual(values = c("white", "gray")) +
+  geom_point(data = top_paths_df, aes(x = Description, y = Label, size = Count),color="red") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()) +
+  xlab('') +
+  ylab('')+coord_flip()
+P1
+```
+
+```{r}
+# library(ggplot2)
+# 
+# # 创建一个包含所有组合的数据框
+# background_df <- expand.grid(
+#   Description = unique(top_paths_df$Description),
+#   Label = unique(top_paths_df$Label)
+# )
+# 
+# # 添加一个用于填充的变量
+# background_df$fill <- (1:nrow(background_df)) %% 2
+# 
+# # 创建图形
+# P1=ggplot() +
+#   geom_rect(data = background_df, aes(xmin = as.numeric(Description) - 0.5, 
+#                                       xmax = as.numeric(Description) + 0.5, 
+#                                       ymin = as.numeric(Label) - 0.5, 
+#                                       ymax = as.numeric(Label) + 0.5, 
+#                                       fill = as.factor(fill))) +
+#   scale_fill_manual(values = c("white", "gray")) +
+#   geom_point(data = top_paths_df, aes(x = Description, y = Label, size = Count)) +
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+#         panel.background = element_blank(),
+#         panel.grid.major = element_blank(),
+#         panel.grid.minor = element_blank()) +
+#   xlab('') +
+#   ylab('')
+# P1
+```
+
+```{r}
+top_paths <- lapply(results_by_module, function(x) {
+  
+
+    top10<- arrange(x,p.adjust) %>%head(500)
+
+ return(top10)
+})
+
+# 将结果转换为数据框
+Alltop_paths_df <- do.call(rbind, top_paths)
+Alltop_paths_df$Label <- rep(names(top_paths), sapply(top_paths, nrow))
+
+write.csv(Alltop_paths_df,'Alltop_paths_df.csv')
+# 输出结果
+# results_by_module
+head(Alltop_paths_df)
+```

@@ -1,0 +1,652 @@
+---
+title: "Figure data"
+output: html_document
+date: "2024-02-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#----------------------
+
+```{r}
+rm(list = ls())
+```
+
+### Load data
+```{r}
+adata1_obs <- read.csv('/home/maolp/Allcount//All_scanpyData/UmapData//adata1_umap_obsdata.csv')
+```
+
+### load cell_types_sort
+
+```{r}
+source('/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/Cell_types_list.R')
+cell_types_list
+```
+
+
+### calculate_confidence_interval
+```{r}
+calculate_confidence_interval <- function(data) {
+
+    mean_data <- mean(data)
+
+    sd_data <- sd(data)
+    n <- length(data)
+    se <- sd_data / sqrt(n)
+    ci <- qt(0.975, df=n-1) * se
+    lower_bound <- mean_data - ci
+    upper_bound <- mean_data + ci
+    
+
+    return(list(mean = mean_data, lower_bound = lower_bound, upper_bound = upper_bound, se = se))
+}
+
+
+
+result <- calculate_confidence_interval(percentages)
+
+
+print(result)
+```
+#----------------------
+# All Percentage
+```{r}
+table(adata1_obs$Cell_lineage,adata1_obs$new_Body)
+```
+### Organ Cell_lineage
+```{r}
+
+tab <- table(adata1_obs$Cell_lineage, adata1_obs$new_Body)
+
+
+tab_percent <- prop.table(tab, margin = 2) * 100
+
+
+print(tab_percent)
+write.csv(tab_percent,"PaperData/All_Organ_Cell_lineage_percentage.csv")
+```
+
+### Organ cell_type
+```{r}
+Cellmain <- table(adata1_obs$Last_cell_type, adata1_obs$new_Body)
+
+
+Cellmain_percent <- prop.table(Cellmain, margin = 2) * 100
+Cellmain_percent=Cellmain_percent[cell_types_list,]
+
+print(Cellmain_percent)
+write.csv(Cellmain_percent,"PaperData/All_Organ_Celltype_percentage.csv")
+print(Cellmain_percent)
+```
+
+### SampleID cell_type
+
+```{r}
+Sample <- table(adata1_obs$Last_cell_type, adata1_obs$AdjustedID)
+
+
+Sample_percent <- prop.table(Sample, margin = 2) * 100
+
+Sample_percent=Sample_percent[cell_types_list,]
+print(Sample_percent)
+write.csv(Sample_percent,"PaperData/All_Sample_individual_Celltype_percentage.csv")
+print(Sample_percent)
+```
+
+
+```{r}
+rownames(Sample_percent)
+```
+
+```{r}
+colnames(Sample_percent)
+```
+```{r}
+unlist(as.vector(t(Sample_percent[37,17:22])))
+                                                                                                                                                                                                                                                                                                                                                                                                                 ```
+
+```{r}
+
+calculate_confidence_interval(unlist(as.vector(t(Sample_percent[37,17:22]))))
+```
+
+
+```{r}
+Sample <- table(adata1_obs$Last_cell_type, adata1_obs$AdjustedID)
+
+
+Sample_percent <- prop.table(Sample, margin = 2) * 100
+
+Sample_percent=Sample_percent[cell_types_list,]
+print(Sample_percent)
+write.csv(Sample_percent,"PaperData/All_Sample_individual_Celltype_percentage.csv")
+print(head(Sample_percent))
+```
+
+```{r}
+
+```
+
+#------------------------
+# CD45 Percentage
+
+### Get Immunedata
+
+```{r}
+cell_types_list33=cell_types_list[1:33]
+```
+
+```{r}
+adata1_immue=subset(adata1_obs,Cell_lineage!="MK/ERY"&Cell_lineage!="OTHERS")
+```
+
+### Organ Cell_lineage
+```{r}
+ImmueOrgancell <- table(adata1_immue$Cell_lineage, adata1_immue$new_Body)
+
+
+ImmueOrgancell_percent <- prop.table(ImmueOrgancell, margin = 2) * 100
+# ImmueOrgancell_percent=ImmueOrgancell_percent
+
+print(ImmueOrgancell_percent)
+write.csv(ImmueOrgancell_percent,"PaperData/Immue_Organ_Celltype_percentage.csv")
+print(ImmueOrgancell_percent)
+```
+###  Organ cell_type
+```{r}
+Immunemain <- table(adata1_immue$Last_cell_type, adata1_immue$new_Body)
+
+
+Immunemain_percent <- prop.table(Immunemain, margin = 2) * 100
+Immunemain_percent=Immunemain_percent[cell_types_list33,]
+
+print(Immunemain_percent)
+write.csv(Immunemain_percent,"PaperData/Immune_Organ_Immunetype_percentage.csv")
+print(Immunemain_percent)
+```
+
+
+
+### SampleID cell_type
+
+```{r}
+ImmuneS <- table(adata1_immue$Last_cell_type, adata1_immue$AdjustedID)
+
+
+ImmuneS_percent <- prop.table(ImmuneS, margin = 2) * 100
+
+ImmuneS_percent=ImmuneS_percent[cell_types_list33,]
+print(ImmuneS_percent)
+write.csv(ImmuneS_percent,"PaperData/Immune_individual_Celltype_percentage.csv")
+print(ImmuneS_percent)
+```
+
+
+
+
+```{r}
+Sample_percent[c(1:3),]
+```
+
+
+
+
+```{r}
+apply(Sample_percent[c(1:3),],2,sum)
+```
+```{r}
+calculate_confidence_interval(apply(Sample_percent[c(1:3),grep("B",colnames(Sample_percent))],2,sum))
+```
+```{r}
+calculate_confidence_interval(apply(Sample_percent[c(1:3),grep("L",colnames(Sample_percent))],2,sum))
+```
+
+
+### batch read csv
+```{r}
+read_and_assign_csvs <- function(folder_path) {
+  file_list <- list.files(path = folder_path, pattern = "\\.csv$", full.names = TRUE)
+  for (file_path in file_list) {
+    file_name <- tools::file_path_sans_ext(basename(file_path))
+    assign(file_name, read.csv(file_path), envir = .GlobalEnv)
+  }
+}
+```
+
+
+#-----------------------
+# TCR
+
+```{r}
+read_and_assign_csvs("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure4/Data/")
+```
+
+### Sample
+```{r}
+
+library(tidyr)
+
+TCRsample_wide_data <- pivot_wider(Figure4A_TCRF2_allsamplepercentage[,c(2:4)], 
+                         names_from = tissue, 
+                         values_from = proportion, 
+                         id_cols = category) %>% as.data.frame()
+TCRsample_wide_data[,-1]=TCRsample_wide_data[,-1]*100
+
+write.csv(TCRsample_wide_data,"TCRdata/TCRsample_wide_data.csv")
+```
+
+```{r}
+selected_vector <- unlist(TCRsample_wide_data[1, grep("T", colnames(TCRsample_wide_data))], use.names = FALSE)
+
+
+selected_vector
+calculate_confidence_interval(selected_vector)
+```
+### meta
+```{r}
+TCRmeta=read.csv("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure4/Data/TCRmeta.csv")
+head(TCRmeta)
+```
+### clone
+
+```{r}
+clone_sample_percentage=as.data.frame.array(prop.table(table(TCRmeta$clone_id_size,TCRmeta$AdjustedID), margin = 2) * 100 ) %>% as.data.frame()
+write.csv(clone_sample_percentage,"TCRdata/clone_sample_percentag.csv")
+```
+
+```{r}
+
+```
+
+```{r}
+calculate_confidence_interval(apply(clone_sample_percentage[-1,], 2, sum))
+```
+
+```{r}
+clone_sample_count=as.data.frame.array(table(TCRmeta$clone_id_size,TCRmeta$AdjustedID))
+write.csv(clone_sample_count,"TCRdata/clone_sample_count.csv")
+```
+
+
+
+### Organ
+```{r}
+library(tidyr)
+
+TCROrgan_wide_data <- pivot_wider(Figure4B_TCRF2_allsamplepercentage, 
+                                   names_from = tissue, 
+                                   values_from = proportion, 
+                                   id_cols = category) %>% as.data.frame()
+TCROrgan_wide_data[,-1]=TCROrgan_wide_data[,-1]*100
+
+write.csv(TCROrgan_wide_data,"TCRdata/TCROrgan_wide_data.csv")
+```
+
+
+```{r}
+
+```
+
+
+#-----------------------
+# BCR
+
+```{r}
+
+read_and_assign_csvs("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure3/Data/")
+```
+
+
+### orphan
+```{r}
+unique(AllBCR_withorphan$chain_pairing)
+```
+
+```{r}
+BCRorphanVDJ=subset(AllBCR_withorphan,chain_pairing=="orphan VDJ" )
+
+prop.table(table(BCRorphanVDJ$New_Body,BCRorphanVDJ$chain_pairing),2)
+
+write.csv(prop.table(table(BCRorphanVDJ$New_Body,BCRorphanVDJ$chain_pairing),2),"BCRdata/Organ_pop.csv")
+```
+
+```{r}
+BCRorphanVDJ2=BCRorphanVDJ[,c("obs_names","chain_pairing")]
+BCRorphanVDJ3=merge(BCRorphanVDJ2,adata1_obs,by.x="obs_names",by.y="Cellname")
+prop.table(table(BCRorphanVDJ3$new_Body,BCRorphanVDJ3$chain_pairing),2)
+```
+
+```{r}
+adata1_obs[,c("Cellname")]
+```
+```{r}
+subset(BCRorphanVDJ,AdjustedID=="")
+```
+
+```{r}
+merge(,)
+```
+
+```{r}
+# 检查New_Body列的唯一值
+unique(BCRorphanVDJ$New_Body)
+
+# 检查New_Body列中是否有NA值
+sum(is.na(BCRorphanVDJ$New_Body))
+
+# 检查chain_pairing列的唯一值
+unique(BCRorphanVDJ$chain_pairing)
+
+# 检查chain_pairing列中是否有NA值
+sum(is.na(BCRorphanVDJ$chain_pairing))
+```
+
+
+```{r}
+Figure3A_BCRF2_allsamplepercentage
+```
+### Sample
+
+
+
+```{r}
+library(tidyr)
+
+BCRsample_wide_data <- pivot_wider(Figure3A_BCRF2_allsamplepercentage[,c(2:4)], 
+                         names_from = tissue, 
+                         values_from = proportion, 
+                         id_cols = category) %>% as.data.frame()
+BCRsample_wide_data[,-1]<-BCRsample_wide_data[,-1]*100
+print(BCRsample_wide_data)
+write.csv(BCRsample_wide_data,"BCRdata/BCRsample_wide_data.csv")
+```
+
+
+```{r}
+LiverBCRsample_wide_data=BCRsample_wide_data[,grep("L",colnames(BCRsample_wide_data))]
+rownames(LiverBCRsample_wide_data)<-BCRsample_wide_data$category
+LiverBCRsample_wide_data<-LiverBCRsample_wide_data*100
+
+```
+
+### Organ
+```{r}
+
+library(tidyr)
+
+BCROrgan <- pivot_wider(Figure5B_BCR_sumVDJ[,2:4], 
+                         names_from = tissue, 
+                         values_from = proportion, 
+                         id_cols = category) %>% as.data.frame()
+rownames(BCROrgan)<-BCROrgan$category
+BCROrgan<-BCROrgan[,-1]
+BCROrgan<-BCROrgan*100
+write.csv(BCROrgan,"BCRdata/BCROrgan_wide_data.csv")
+```
+
+```{r}
+ # save.image("/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_Jupyter/HFB0406Olink/Figure6_per_compare/old.RData")
+```
+
+### meta
+
+
+```{r}
+metaBCR=read.csv("/home/maolp/Allcount//All_scanpyData/BCRTCR/BCRobsmeta.csv")
+```
+
+```{r}
+meta=metaBCR
+metaisotypes=meta[,c("AdjustedID","isotype_status")]
+table(metaisotypes$isotype_status,metaisotypes$AdjustedID)->metaisotypes_tab
+metaisotypes_percent <-as.data.frame.array(prop.table(metaisotypes_tab, margin = 2) * 100 ) %>% as.data.frame()
+write.csv(metaisotypes_percent,"BCRdata/metaisotypes_percent.csv")
+```
+
+```{r}
+table(metaBCR$changeo_clone_id_size_max_6,metaBCR$AdjustedID)->meta_Samplesotypes_clone_tab
+meta_Samplesotypes_clone_percent <-as.data.frame.array(prop.table(meta_Samplesotypes_clone_tab, margin = 2) * 100 ) %>% as.data.frame()
+write.csv(meta_Samplesotypes_clone_percent,"BCRdata/meta_Sampleisotypes_clone_percent.csv")
+```
+
+
+#### clone
+```{r}
+table(metaBCR$changeo_clone_id_size_max_6,metaBCR$New_Body)->meta_Organsotypes_clone_tab
+meta_Organsotypes_clone_percent <-as.data.frame.array(prop.table(meta_Organsotypes_clone_tab, margin = 2) * 100 ) %>% as.data.frame()
+write.csv(meta_Organsotypes_clone_percent,"BCRdata/meta_Organisotypes_clone_percent.csv")
+```
+```{r}
+selected_vector <- unlist(meta_Samplesotypes_clone_percent[2, grep("B", colnames(meta_Samplesotypes_clone_percent))], use.names = FALSE)
+
+
+selected_vector
+calculate_confidence_interval(selected_vector)
+```
+
+
+#-----------------------
+# Others
+
+
+```{r}
+Countab=read.csv("/home/maolp/Allcount/All_scanpyData/Countplot/resultw2_sums.csv")
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+# %%R -w 3000 -h 1200 -r 150
+library(dplyr)
+library(tidyr)
+
+process_grouped_data <- function(adata1_obs) {
+  grouped_data <- adata1_obs %>%
+    group_by(AdjustedID, Last_cell_type_num, Cell_lineage) %>%
+    summarise(count = n()) %>%
+    group_by(AdjustedID) %>%
+    mutate(week_total = sum(count))
+
+  grouped_data <- grouped_data %>%
+    separate(AdjustedID, into = c("Part1", "Part2"), sep = "\\.", remove = FALSE)
+
+  grouped_data <- grouped_data %>%
+    separate(Part1, into = c("Body", "Week"), sep = "(?<=\\D)(?=\\d)", remove = FALSE) %>%
+    mutate(percentage = count / week_total)
+
+  grouped_data <- grouped_data %>%
+    mutate(week_number = row_number())
+
+  adjustedID_levels <- unique(grouped_data$AdjustedID)
+  adjustedID_mapping <- setNames(1:length(adjustedID_levels), adjustedID_levels)
+
+  grouped_data <- grouped_data %>%
+    mutate(AdjustedID_numeric = sapply(AdjustedID, function(x) adjustedID_mapping[x]))
+
+  grouped_data <- grouped_data %>%
+    mutate(AdjustedID_letter = substr(AdjustedID, 1, 1)) %>%
+    group_by(AdjustedID_letter) %>%
+    mutate(AdjustedID_numeric = match(AdjustedID, unique(AdjustedID))) %>%
+    ungroup()
+
+  return(grouped_data)
+}
+# grouped_dataB <- subset(adata1_obs, new_Body == "Blood_PBMC")
+                                 
+grouped_data_result <- process_grouped_data(adata1_obs)
+print(grouped_data_result[, 1:6])
+                                       
+print(grouped_data_result[, 7:12])
+library(dplyr)
+
+
+result <- grouped_data_result  %>%
+  group_by(AdjustedID) %>%
+  summarise(sum_percentage = sum(percentage))
+
+print(table(result$sum_percentage))
+                                       
+                         
+# grouped_dataB <- subset(grouped_data_result, Body == "B" & Last_cell_type_num =="45_Mid_ERY")
+# max(grouped_dataB$percentage)*100                                       
+```
+
+```{r}
+# %%R -w 3000 -h 1200 -r 150  
+
+grouped_data_result <- process_grouped_data(adata1_obs)
+prefixes <- as.numeric(gsub("_.*$", "", levels(factor(adata1_obs$Last_cell_type_num))))
+
+sorted_indices <- order(prefixes)
+
+sorted_cell_types <- levels(factor(adata1_obs$Last_cell_type_num))[sorted_indices]
+
+print(grouped_data_result[, 1:6])
+                                       
+print(grouped_data_result[, 7:12])
+grouped_data_result$Last_cell_type_num<-factor(grouped_data_result$Last_cell_type_num,level=sorted_cell_types )
+grouped_data_result$Cell_lineage<-factor(grouped_data_result$Cell_lineage,level=c('PRECURSOR','B_CELL','T/ILC','NK','MYELOID','DC','MK/ERY','OTHERS'))
+grouped_data_result$Body<-factor(grouped_data_result$Body,level=c('B','L','T','S'))
+
+```
+
+```{r}
+# %%R -w 3600 -h 1500 -r 200
+library(ggplot2)
+resultw2 <- grouped_data_result %>%
+  group_by(Body, Last_cell_type_num) %>%
+  mutate(WeightedAverage = mean(percentage)) %>%
+  ungroup()
+```
+
+```{r}
+# %%R -w 3600 -h 1500 -r 200
+library(ggplot2)
+unique_adjusted_id <- unique(grouped_data_result$AdjustedID)
+
+
+adjusted_id_first_letter <- substr(unique_adjusted_id, 1, 1)
+body_count <- as.data.frame(table(adjusted_id_first_letter))
+names(body_count) <- c("Body", "body_count")
+
+grouped_data_result <- grouped_data_result %>%
+  select(-contains("body_count"))
+
+grouped_data_result <- left_join(grouped_data_result, body_count, by = "Body")
+grouped_data_result
+
+resultw <- grouped_data_result %>%
+  group_by(Body, Last_cell_type_num, Cell_lineage) %>%
+  summarise(WeightedAverage = weighted.mean(percentage, week_total * body_count))
+resultw
+
+library(ggplot2)
+resultw$Body<-factor(resultw$Body,level=c('B','L','T','S'),label=c("PBMC","Liver","Thymus","Spleen"))
+P21=ggplot(resultw, aes(x= Last_cell_type_num, y=WeightedAverage,fill=Body)) +
+  geom_col(position="fill") +
+  theme_minimal() +
+  xlab("Cell Type") +
+  ylab("Weighted Average") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   scale_fill_brewer(palette = "Set1") +  
+facet_grid(. ~ Cell_lineage, space = "free", scales = "free", switch = "y") +
+  scale_fill_manual(values= c('#C71000FF',"#f49128","#023f75","#5A9599FF"))+ 
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank())+xlab("")+ylab("Relative abundance (%)")  +
+scale_y_continuous(labels=seq(0,100, by=25)) +xlab("")
+P21
+# ggsave(plot=P21,"/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure1/Figure1F_Organpercentage_plot.pdf", width = 16, height = 8)
+# P21
+
+```
+
+
+```{r}
+P21$data
+```
+```{r}
+
+WeightedAverage_wide_data <- pivot_wider(resultw[,c(1:2,4)], 
+                         names_from =Last_cell_type_num, 
+                         values_from =WeightedAverage, 
+                         id_cols = Body) %>% as.data.frame()
+
+WeightedAverage_wide_data[is.na(WeightedAverage_wide_data)] <- 0
+
+
+```
+
+```{r}
+
+Wcolumn_sums <- colSums(WeightedAverage_wide_data[,-1])
+
+
+Wdf_prop <-  sweep(WeightedAverage_wide_data[,-1], 2, Wcolumn_sums, FUN = "/") * 100
+
+
+print(Wdf_prop)
+rownames(Wdf_prop)<-WeightedAverage_wide_data$Body
+
+write.csv(WeightedAverage_wide_data,"PaperData/WeightedAverage_wide_count.csv")
+write.csv(Wdf_prop,"PaperData/WeightedAverage_wide_percentage.csv")
+```
+
+
+```{r}
+WeightedAverage_wide_data 
+```
+
+
+```{r}
+# %%R -w 4000 -h 1000 -r 300
+library(RColorBrewer)
+resultw <- grouped_data_result %>%
+  group_by(Body, Last_cell_type_num, Cell_lineage) %>%
+  summarise(WeightedAverage = weighted.mean(count, week_total ))
+resultw
+resultw2=resultw
+
+resultw2$Body <-factor(resultw2$Body,level=c('B','L','T','S'),label=c("PBMC","Liver","Thymus","Spleen"))
+
+
+wegitcountplot=ggplot(resultw2, aes(x =Last_cell_type_num , y = Body, fill = WeightedAverage)) +
+  geom_tile(color = "white") + 
+  geom_text(aes(label = round(WeightedAverage)), size = 4) + 
+  scale_fill_gradient(low = "white", high = "steelblue") +  
+  theme_minimal() +
+  xlab("Body") +
+  ylab("Cell Type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+facet_grid(.~ Cell_lineage,, space = "free", scales = "free", switch = "y") +
+#   facet_grid(. ~ Cell_lineage) +
+  theme_bw(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank()) +
+  xlab("") +
+  ylab("Weight Count")+scale_fill_gradientn(colours = rev(colorRampPalette(brewer.pal(9, "Spectral"))(100)))
+
+wegitcountplot
+
+# ggsave(plot=wegitcountplot,'/home/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Sup_Figure1/S4/S4_wegitcountplot.pdf',width=20,height=4)
+wegitcountplot
+
+```
+
+```{r}
+
+```
+

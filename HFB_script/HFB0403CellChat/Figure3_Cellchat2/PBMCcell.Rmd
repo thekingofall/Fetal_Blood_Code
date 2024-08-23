@@ -1,0 +1,89 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-11-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+PBMCcell=readRDS("/home/maolp/Allcount/Last_All_scanpyData/Cellchat/PBMC_cellchat.rds")
+```
+
+```{r}
+library(CellChat)
+```
+
+
+```{r}
+# %%R -w 6000 -h 3000 -r 500
+# library(gridExtra)
+# gg1 <- netVisual_heatmap(PBMC_cellchat2,cluster.rows=F)
+# #> Do heatmap based on a merged object
+# gg2 <- netVisual_heatmap(PBMC_cellchat2, measure = "weight")
+# 
+# # pdf(file = "/home/maolp/Allcount/Last_All_scanpyData/Cellchat/gg3.pdf", width = 10, height = 5)
+# 
+# print(gg1+gg2)
+# print(gg1)
+
+
+# dev.off()
+```
+```{r}
+test1=PBMCcell[[1]]
+```
+
+```{r}
+# %%R
+# object.list=PBMCcell
+PBMCcell[[1]]=netAnalysis_computeCentrality(PBMCcell[[1]], slot.name = "netP") 
+PBMCcell[[2]]=netAnalysis_computeCentrality(PBMCcell[[2]], slot.name = "netP") 
+# object.list
+
+# names(object.list)<-c("PBMC_Early","PBMC_late")
+```
+
+```{r}
+library(CellChat)
+# %%R
+GroupStat_res2<-list(PBMCcell[[2]],PBMCcell[[1]])
+PBMC_cellchat2 <- mergeCellChat(GroupStat_res2, add.names = c("PBMC_Early","PBMC_late"))
+```
+```{r}
+gg1 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat2 , idents.use = "CX3CR1+ NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF") )+theme(aspect.ratio = 1.5)
+
+ggsave(plot = gg1,"PBMCcellchat/CX3CR1NK.pdf",width = 10,height = 5)
+```
+
+```{r}
+PBMC_cellchat2@netP[["PBMC_Late"]]$pathways
+```
+
+```{r}
+netAnalysis_diff_signalingRole_scatter
+```
+
+```{r}
+
+gg2 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat2 , idents.use = "CXCR6+ NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF"))+theme(aspect.ratio = 1.5)
+gg2
+ggsave(plot = gg2,"PBMCcellchat/CXCR6NK.pdf",width = 10,height = 5)
+```
+```{r}
+gg2 <- netAnalysis_signalingChanges_scatter(PBMC_cellchat2 , idents.use = "CD56highCD16low NK",color.use = c("#8A4198FF", "#5A9599FF", "#FF6348FF"))+theme(aspect.ratio = 1.5)
+gg2
+ggsave(plot = gg2,"PBMCcellchat/CD56highCD16lowNK.pdf",width = 10,height = 5)
+```
+
+
+```{r}
+unique(PBMC_cellchat2@meta$labels)
+```
+
+```{r}
+
+```
+

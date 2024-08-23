@@ -1,0 +1,978 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-10-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+#----R load----
+### Load R packages
+```{r}
+library(tidyverse)
+library(pheatmap)
+```
+
+### Load save Data
+```{r}
+# load("/data1/maolp/Codeman/Project/Main_Gao_ScanpyProject20231130/Gao_plot/Figure3_TCRBCR_CDR3/DATA/MainTCR2_20231026.RData")
+```
+
+#----Data load----
+
+#### load Raw TCR
+
+```{r}
+TCRdir="TCR_all/"
+TCRsamples=list.files(path = TCRdir,"csv")
+AllTCR=data.frame()
+for (line in TCRsamples) {
+#   print(line)
+  name=gsub("_TCR_filtered_contig_annotations.csv","",line)
+  # print(name)
+  if (!name %in% c("C27","Z26")){
+     Test_TCR<-read.csv(file.path(TCRdir,line))
+     Test_TCR$barcodename=paste0(name,"_",Test_TCR$barcode)
+     Test_TCR$Group<-name
+     AllTCR=rbind(AllTCR,Test_TCR)
+  }
+ 
+}
+head(AllTCR)
+```
+
+
+####Load IMGT
+
+```{r}
+TRAIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRAgenelocus.csv')
+TRBIMGT=read.csv('~/Main_Gao_ScanpyProject20231130/HFB_script_in_save/TCRgene/Gene/TRBlocus.csv')
+TRBJIMGT=TRBIMGT[grep("TRBJ",TRBIMGT$IMGT_gene_name),]
+TRAJIMGT=TRAIMGT[grep("TRAJ",TRAIMGT$IMGT_gene_name),]
+```
+
+#### Load obs
+
+```{r}
+TCRobs=read.csv("/data5/maolp/Gaofeng_All_matrix/Allcount/All_scanpyData/Data/TCRobs.csv")
+TCRobs
+```
+
+```{r}
+subTRA=AllTCR[AllTCR$chain=="TRA",]
+subTRB=AllTCR[AllTCR$chain=="TRB",]
+```
+
+
+```{r}
+subTRBobs<-merge(subTRB,TCRobs,by.x="barcodename",by.y="Cellname")
+```
+```{r}
+colnames(subTRBobs)[grep("call",colnames(subTRBobs))] %>% .[grep("_1",.)]
+```
+
+
+
+
+```{r}
+subTRBobs[,c("cdr3","IR_VDJ_1_junction_aa")]
+subTRBobs2<-subTRBobs[!duplicated(subTRBobs$barcodename),]
+```
+
+### Get TCRB
+
+```{r}
+subVDJ=subTRBobs2[,c("AdjustedID","New_Body",colnames(subTRBobs2)[grep("call",colnames(subTRBobs))] %>% .[grep("_1",.)])]
+# subVDJ$Week=
+```
+### Get TCRA
+```{r}
+subTRA=subTRBobs2[,c("AdjustedID","New_Body",colnames(subTRBobs2)[grep("call",colnames(subTRBobs))]
+                     %>% .[grep("_1",.)])] 
+# subTRA=
+```
+
+
+
+
+```{r}
+unique(subVDJ$AdjustedID)
+subVDJ$Week=substring(subVDJ$AdjustedID,2,5) %>% as.numeric()
+subVDJ$Satge<-ifelse(subVDJ$Week>26,"Late","Early")
+subVDJ$OrganStage<-paste0(subVDJ$Satge,"_",subVDJ$New_Body)
+```
+
+```{r}
+subVDJ$TRBVJ=paste0(subVDJ$IR_VDJ_1_v_call,"_",subVDJ$IR_VDJ_1_j_call)
+```
+
+```{r}
+table(subVDJ$AdjustedID,subVDJ$TRBVJ) %>% as.data.frame()
+```
+
+
+
+#----All TCR Freq----
+
+
+### All percentage heatmap
+
+```{r}
+subTRBh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+```
+
+```{r}
+subTRBh1 = subVDJ[grep("B", subVDJ$AdjustedID), ]
+TRBVJ = table(subTRBh1$TRBVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+TRBVJ$Per = TRBVJ$Freq / sum(TRBVJ$Freq) * 100
+PBMCTRBVJ_separated <- TRBVJ %>%
+  separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+
+PBMCTRBVJ_wide <- PBMCTRBVJ_separated %>% select(-Freq) %>%
+  spread(key = Vgene, value = Per)
+rownames(PBMCTRBVJ_wide) <- PBMCTRBVJ_wide$Jgene
+PBMCTRBVJ_wide <- PBMCTRBVJ_wide[, -1]
+PBMCTRBVJ_wide[is.na(PBMCTRBVJ_wide)] <- 0
+library(pheatmap)
+pheatmap(
+  PBMCTRBVJ_wide,
+  border_color = "white",
+  color = rev(colorRampPalette(
+    c('#C6403D', "#f6c619", 'white', '#246BAE')
+  )(100))
+)
+```
+
+
+### All TCR VDJheatmap
+
+#### Main Function
+
+##### TRBIMGTsub
+```{r}
+TRBIMGTsub=TRBIMGT[TRBIMGT$IMGT_gene_name %in% subVDJ$IR_VDJ_1_v_call,] %>% arrange(IMGT_gene_order)
+```
+
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+VDJheatmap <- function(data,pattern, TRBinIMGT=TRBIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  TRBVJ = table(sub_data$TRBVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  TRBVJ$Per = TRBVJ$Freq / sum(TRBVJ$Freq)*100
+  
+  separated_data <- TRBVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+missing_cols <- setdiff(TRBinIMGT$IMGT_gene_name, colnames(wide_data))
+
+
+for(col in missing_cols) {
+  wide_data[[col]] <- 0
+}
+  wide_data<-wide_data[,TRBinIMGT$IMGT_gene_name]
+  pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  return(wide_data)
+}
+```
+
+
+```{r}
+library(tidyverse)
+library(pheatmap)
+
+VDJheatmap_data <- function(data,pattern, TRBinIMGT=TRBIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  TRBVJ = table(sub_data$TRBVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  TRBVJ$Per = TRBVJ$Freq / sum(TRBVJ$Freq)
+  
+  separated_data <- TRBVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  return( wide_data)
+  # wide_data<-wide_data[,TRBinIMGT$IMGT_gene_name]
+  # pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  # return(wide_data)
+}
+```
+
+#### Early_PBMC
+```{r}
+VDJheatmap(subVDJ,pattern =  "Early_PBMC",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_PBMC TRB")
+```
+#### Late_PBMC no cluster
+```{r}
+VDJheatmap(subVDJ, pattern = "Late_PBMC",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Late_PBMC TRB")
+```
+
+#### Late_PBMC cluster
+```{r}
+VDJheatmap(subVDJ, pattern = "Late_PBMC",id_col="OrganStage",cluster_col=T,cluster_row=T,title = "Late_PBMC TRB")
+```
+####  Early_PBMC cluster
+```{r}
+VDJheatmap(subVDJ,pattern =  "Early_PBMC",id_col="OrganStage",cluster_col=T,cluster_row=,title = "Early_PBMC")
+```
+
+####  All_PBMC cluster
+```{r}
+VDJheatmap(subVDJ, "B",cluster_col=F,cluster_row=F,title = "PBMC")
+```
+
+#### Early_Liver
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Liver",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Liver TRB")
+```
+
+#### Early_Spleen
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Spleen",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Spleen TRB")
+```
+#### Early_Thymus
+```{r}
+VDJheatmap(subVDJ,pattern = "Early_Thymus",id_col="OrganStage",cluster_col=F,cluster_row=F,title = "Early_Thymus")
+```
+
+
+#----Per Sample TRB----
+
+### Get Sample percentage
+```{r}
+subTRBh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+Sample_TRBVJ=table(subTRBh1$AdjustedID,subTRBh1$TRBVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_TRBVJ)<-c("AdjustedID","VDJ","Freq")
+
+total_freq_by_id <- Sample_TRBVJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_TRBVJ <- left_join(Sample_TRBVJ, total_freq_by_id, by = "AdjustedID")
+
+
+Sample_TRBVJ <- Sample_TRBVJ %>% 
+  mutate(Per = Freq / total_freq*100)
+
+Sample_TRBVJ <- Sample_TRBVJ %>% arrange(AdjustedID)
+Sample_TRBVJ$Week=substring(Sample_TRBVJ$AdjustedID,2,5) %>% as.numeric()
+```
+```{r}
+subTRA
+```
+
+
+
+
+```{r}
+unique(Sample_TRBVJ$AdjustedID)
+```
+### Sample top TRB
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+
+Sample_TRBVJ$Week <- as.numeric(Sample_TRBVJ$Week)
+Sample_TRBVJ$Per <- as.numeric(Sample_TRBVJ$Per)
+
+
+top_VDJ <- Sample_TRBVJ %>% 
+  group_by(VDJ) %>%
+  summarise(Total_Per = sum(Per)) %>%
+  top_n(10, Total_Per) %>%
+  pull(VDJ)
+
+Sample_TRBVJ <- Sample_TRBVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% top_VDJ, VDJ, "Other"))
+Sample_TRBVJ$VDJ_Top10<-factor(Sample_TRBVJ$VDJ_Top10,levels = c(as.character(top_VDJ),"Other"))
+```
+
+
+
+
+```{r}
+table(Sample_TRBVJ$AdjustedID)
+```
+
+#### Plot: top TRB line 
+
+```{r}
+
+ggplot(Sample_TRBVJ, aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  geom_line() +
+  scale_color_manual(values = c(rainbow(10), "gray")) +
+  labs(x = "Week", y = "Per", color = "VDJ") +
+  theme_classic()
+```
+### PerSample Cor TRBV
+```{r}
+
+PBMCTRB_cor_results <- Sample_TRBVJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+PBMCTRB_cor_results<-PBMCTRB_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(PBMCTRB_cor_results)
+subset(PBMCTRB_cor_results,p.adjusted<0.1) %>% arrange(cor)
+PBMCTRB_cor_results$VDJcor<-ifelse(PBMCTRB_cor_results$p.value>0.05,"NA",ifelse(PBMCTRB_cor_results$cor>0,"+","-"))
+```
+```{r}
+subset(PBMCTRB_cor_results,p.adjusted<0.2)
+```
+#### Plot: top sig TRB line 
+
+
+
+```{r}
+library(ggsci)
+top_VDJ=subset(PBMCTRB_cor_results,p.adjusted<0.1) %>% arrange(cor) %>% .$VDJ %>% .[-1]
+Sample_TRBVJ <- Sample_TRBVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% top_VDJ, VDJ, "Other")) %>% 
+mutate(VDJ_Top10=factor(VDJ_Top10,levels = c(as.character(top_VDJ),"Other")))
+subset(Sample_TRBVJ,VDJ_Top10!= "Other") %>% 
+ggplot() +
+  geom_line( aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  scale_color_manual(values = c(rainbow(length(top_VDJ)), "gray")) +
+  labs(x = "Week", y = "Percentage", color = "Top VDJ") +
+  theme_classic()+scale_color_cosmic()
+```
+```{r}
+library(ggsci)
+top_VDJ=subset(PBMCTRB_cor_results,p.adjusted<0.1) %>% arrange(cor) %>% .$VDJ 
+Sample_TRBVJ <- Sample_TRBVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% top_VDJ, VDJ, "Other")) %>% 
+mutate(VDJ_Top10=factor(VDJ_Top10,levels = c(as.character(top_VDJ),"Other")))
+subset(Sample_TRBVJ,VDJ_Top10!= "Other") %>% 
+ggplot() +
+  geom_line( aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  scale_color_manual(values = c(rainbow(length(top_VDJ)), "gray")) +
+  labs(x = "Week", y = "Percentage", color = "Top VDJ") +
+  theme_classic()+scale_color_cosmic()
+```
+
+```{r}
+Sample_TRBVJ %>% arrange(desc(Per))
+```
+
+```{r}
+# 
+# PBMCTRBVJ_separated <- TRBVJ%>%
+#   separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+# 
+# PBMCTRBVJ_wide <- PBMCTRBVJ_separated %>%select(-Freq) %>% 
+#   spread(key =Vgene, value = Per)
+# rownames(PBMCTRBVJ_wide)<-PBMCTRBVJ_wide$Jgene
+# PBMCTRBVJ_wide<-PBMCTRBVJ_wide[,-1]
+# PBMCTRBVJ_wide[is.na(PBMCTRBVJ_wide)]<-0
+```
+```{r}
+# library(pheatmap)
+# pheatmap(PBMCTRBVJ_wide,border_color = "white",color =rev( colorRampPalette(c('#C6403D', 'white','#246BAE'))(100)))
+```
+
+
+
+```{r}
+intersect(TRBIMGT$IMGT_gene_name,subVDJ$IR_VDJ_1_v_call)
+```
+
+```{r}
+setdiff(subVDJ$IR_VDJ_1_v_call,TRBIMGT$IMGT_gene_name)
+```
+
+
+```{r}
+test1=VDJheatmap_data(subVDJ, pattern = "B",cluster_col=F,cluster_row=F,title = "PBMC")
+```
+```{r}
+#   wide_data<-wide_data[,TRBinIMGT$IMGT_gene_name]
+# setdiff(TRBIMGTsub$IMGT_gene_nam,colnames(test1))
+```
+```{r}
+
+```
+
+
+
+
+### TRBfunction Data
+
+```{r}
+library(ggplot2)
+library(reshape2) # for melt function
+
+VDJfun <- function(data,pattern, TRBinIMGT=TRBIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  TRBVJ = table(sub_data$TRBVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  TRBVJ$Per = TRBVJ$Freq / sum(TRBVJ$Freq)*100
+  
+  separated_data <- TRBVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(TRBinIMGT$IMGT_gene_name, colnames(wide_data))
+
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  
+  wide_data <- wide_data[,TRBinIMGT$IMGT_gene_name]
+  
+  return(wide_data)
+}
+```
+
+
+####  TRBlongexp
+```{r}
+TRBFreq_exp=VDJfun(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+
+
+TRBFreq_exp=rownames_to_column(TRBFreq_exp)
+TRBlongexp <- melt(TRBFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+colnames(TRBlongexp)<-c("Jgene","Vgene","Per")
+TRBlongexp$Sample=paste0(TRBlongexp$Vgene,"_",TRBlongexp$Jgene)
+TRBlongexp$VDJsig<-TRBlongexp$Sample %in% as.character(top_VDJ)
+
+
+TRBlongexp$VDJsig <- ifelse(TRBlongexp$VDJsig, TRBlongexp$Sample, "Others")
+```
+
+#### PBMCTRB_cor_results
+```{r}
+dim(PBMCTRB_cor_results)
+PBMCTRB_cor_results=PBMCTRB_cor_results %>% separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")
+PBMCTRB_cor_results2=subset(PBMCTRB_cor_results,p.value<0.05&abs(cor)>0.6)
+dim(TRBlongexp)
+# setdiff(TRBlongexp$Sample,PBMCTRB_cor_results$VDJ)
+```
+
+
+#### Plot:cor percentage heatmmap 
+```{r}
+TRBlongexp$Jgene<-factor(TRBlongexp$Jgene,levels = rev(TRBJIMGT$IMGT_gene_name))
+```
+```{r}
+PBMCTRB_cor_results2
+```
+```{r}
+TRBlongexp
+```
+
+
+```{r}
+library(ggplot2)
+
+
+PBMCTRB_cor_results2$size_factor <- cut(abs(PBMCTRB_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+TRBp1 <- ggplot() +
+  geom_tile(data = TRBlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All TRB", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCTRB_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 4, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(TRBp1)
+
+ggsave(plot = TRBp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure4/Figure4E_TRB_all_VJcombined.pdf",width = 8,height = 4)
+```
+```{r}
+
+```
+
+
+#### Plot:test ggplot cluster 
+```{r}
+# library(reshape2)
+# mat_data <- dcast(long_data, Vgene ~ Jgene, value.var = "Per")
+# rownames(mat_data) <- mat_data$Vgene
+# mat_data <- mat_data[, -1]
+# mat_data <- as.matrix(mat_data)
+# clusters_row <- hclust(dist(mat_data), method = "ave")
+# clusters_col <- hclust(dist(t(mat_data)), method = "ave")
+# long_data_clustered <- melt(mat_data)
+# colnames(long_data_clustered) <- c("Vgene", "Jgene", "Per")
+```
+
+
+
+```{r}
+# long_data_clustered$Vgene<-as.character(long_data_clustered$Vgene)
+# long_data_clustered$Jgene<-as.character(long_data_clustered$Jgene)
+```
+
+
+
+```{r}
+# P1 <- ggplot(long_data_clustered, aes(x =Jgene, y =  Vgene, fill = Per)) +
+#   geom_tile(color = "white") +
+#   scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+#                        na.value = "white") +
+#   theme_minimal() +
+#   labs(title = "TRB", x = "V gene", y = "J gene") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1),
+#         plot.title = element_text(hjust = 0.5)) +
+#   scale_x_dendrogram(labels = T, hclust = clusters_col) +
+#   scale_y_dendrogram(labels = T, hclust = clusters_row) 
+# 
+# print(P1)
+```
+```{r}
+# subTRBsortgene=subset(TRBlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+# subTRBvdjlen[subTRBvdjlen$VDJ %in%subTRBsortgene ,] %>% mutate(VDJ=factor(VDJ,levels=rev(subTRBsortgene)))%>%
+#   ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+#                                                                                         na.value = "white") +
+#   theme_minimal() +
+#   labs(title = "PBMC TRB", x = "", y = " ",fill="Percentage(%)") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1),
+#         plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+# ggplot()+geom_tile(data=PBMCTRBVJ_separated,aes(Vgene,Jgene,fill=0),color="gray52",fill="white",size=1)+geom_tile(data=PBMCTRBVJ_separated ,aes(Vgene,Jgene,value=Per,fill=Per))+ theme(axis.text.x=element_text(angle=90, hjust=1)) + scale_fill_gradientn(colours =rev(colorRampPalette(c('#C6403D', 'white','#246BAE'))(111)))+theme(axis.text.y=element_text(size = 12,color=c(rep("#246BAE",4),rep("#D0AB39",4),rep("#3FBDA7",4),rep("#C6403D",4))))+
+#   guides(fill=guide_colorbar(barheight = 28))+theme_bw()+
+#   theme(panel.grid = element_blank(),
+#         panel.border = element_blank(),
+#         axis.text.x = element_text(angle = 60,
+#                                    hjust=1,vjust = 1))
+```
+
+#----Per Sample TRA----
+
+### Get Sample percentage
+
+```{r}
+subVDJ$TRAVJ<-paste0(subVDJ$IR_VJ_1_v_call,"_",subVDJ$IR_VJ_1_j_call)
+```
+
+
+```{r}
+subTRAh1=subVDJ[grep("B",subVDJ$AdjustedID),]
+Sample_TRAVJ=table(subTRAh1$AdjustedID,subTRAh1$TRAVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+library(dplyr)
+colnames(Sample_TRAVJ)<-c("AdjustedID","VDJ","Freq")
+
+TRAVJ_total_freq_by_id <- Sample_TRAVJ %>% 
+  group_by(AdjustedID) %>% 
+  summarise(total_freq = sum(Freq))
+
+Sample_TRAVJ <- left_join(Sample_TRAVJ, TRAVJ_total_freq_by_id, by = "AdjustedID")
+
+
+Sample_TRAVJ <- Sample_TRAVJ %>% 
+  mutate(Per = Freq / total_freq*100)
+
+Sample_TRAVJ <- Sample_TRAVJ %>% arrange(AdjustedID)
+Sample_TRAVJ$Week=substring(Sample_TRAVJ$AdjustedID,2,5) %>% as.numeric()
+```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+Sample_TRAVJ$Week <- as.numeric(Sample_TRAVJ$Week)
+Sample_TRAVJ$Per <- as.numeric(Sample_TRAVJ$Per)
+
+
+topA_VDJ <- Sample_TRAVJ %>% 
+  group_by(VDJ) %>%
+  summarise(Total_Per = sum(Per)) %>%
+  top_n(10, Total_Per) %>%
+  pull(VDJ)
+
+Sample_TRAVJ <- Sample_TRAVJ %>% 
+  mutate(VDJ_Top10 = if_else(VDJ %in% topA_VDJ, VDJ, "Other"))
+Sample_TRAVJ$VDJ_Top10<-factor(Sample_TRAVJ$VDJ_Top10,levels = c(as.character(topA_VDJ),"Other"))
+```
+
+```{r}
+ggplot(Sample_TRAVJ, aes(x = Week, y = Per, color = VDJ_Top10, group = VDJ)) +
+  geom_line() +
+  scale_color_manual(values = c(rainbow(10), "gray")) +
+  labs(x = "Week", y = "Per", color = "VDJ") +
+  theme_classic()
+```
+#### corTRA
+```{r}
+PBMCTRA_cor_results <- Sample_TRAVJ %>%
+  group_by(VDJ) %>%
+  summarise(cor = cor.test(Week, Per, method = "spearman")$estimate,
+            p.value = cor.test(Week, Per, method = "spearman")$p.value)
+PBMCTRA_cor_results<-PBMCTRA_cor_results %>%
+  mutate(p.adjusted = p.adjust(p.value, method = "BH"))%>% arrange(cor)
+
+print(PBMCTRA_cor_results)
+subset(PBMCTRA_cor_results,p.value<0.05) %>% arrange(cor)
+PBMCTRA_cor_results$VDJcor<-ifelse(PBMCTRA_cor_results$p.value>0.05,"NA",ifelse(PBMCTRA_cor_results$cor>0,"+","-"))
+```
+
+### TRAfunction Data
+
+```{r}
+library(ggplot2)
+library(reshape2) # for melt function
+
+TRAVDJfun <- function(data,pattern, TRAinIMGT=TRAIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  TRAVJ = table(sub_data$TRAVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  TRAVJ$Per = TRAVJ$Freq / sum(TRAVJ$Freq)*100
+  
+  separated_data <- TRAVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(TRAinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  
+  wide_data <- wide_data[,TRAinIMGT$IMGT_gene_name]
+  
+  return(wide_data)
+}
+```
+
+```{r}
+TRAIMGTsub=TRAIMGT[TRAIMGT$IMGT_gene_name %in% subVDJ$IR_VJ_1_v_call,] %>% arrange(IMGT_locus_gene_order)
+```
+####  TRAlongexp
+```{r}
+TRAFreq_exp=TRAVDJfun(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+
+
+TRAFreq_exp=rownames_to_column(TRAFreq_exp)
+TRAlongexp <- melt(TRAFreq_exp, varnames = c("rowname", "Vgene"), value.name = "Per")
+colnames(TRAlongexp)<-c("Jgene","Vgene","Per")
+TRAlongexp$Sample=paste0(TRAlongexp$Vgene,"_",TRAlongexp$Jgene)
+TRAlongexp$VDJsig<-TRAlongexp$Sample %in% as.character(top_VDJ)
+
+
+TRAlongexp$VDJsig <- ifelse(TRAlongexp$VDJsig, TRAlongexp$Sample, "Others")
+```
+
+#### PBMCTRA_cor_results
+```{r}
+dim(PBMCTRA_cor_results)
+PBMCTRA_cor_results=PBMCTRA_cor_results %>% separate(VDJ, into = c("Vgene", "Jgene"), sep = "_")
+PBMCTRA_cor_results2=subset(PBMCTRA_cor_results,p.value<0.05 &abs(cor)>0.6)
+dim(TRAlongexp)
+# setdiff(TRAlongexp$Sample,PBMCTRA_cor_results$VDJ)
+```
+
+
+#### Plot:cor percentage heatmmap 
+```{r}
+TRAlongexp$Jgene<-factor(TRAlongexp$Jgene,levels = rev(TRAJIMGT$IMGT_gene_name))
+```
+```{r}
+PBMCTRA_cor_results2
+```
+
+```{r}
+library(ggplot2)
+
+
+PBMCTRA_cor_results2$size_factor <- cut(abs(PBMCTRA_cor_results2$cor),
+                                        breaks = c(-Inf, 0.5, 0.6,0.7,0.8, Inf),
+                                        labels = c("0-0.5","0.5-0.6", "0.6-0.7","0.7-0.8", "0.8-1.0"))
+
+
+TRAp1 <- ggplot() +
+  geom_tile(data = TRAlongexp, aes(x = Vgene, y = Jgene, fill = Per), color = "white") +
+  scale_fill_gradientn(colors = rev(c("#C71000FF", "#edae11", "white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC All TRA", x = "V gene", y = "J gene", fill = "Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5)) +
+  geom_text(data = PBMCTRA_cor_results2, 
+            aes(x = Vgene, y = Jgene, label = VDJcor, color = VDJcor, size = size_factor)) +
+  scale_color_manual(values = c("#3D3B25FF", "#8F1336")) +
+  scale_size_manual(values = c("0-0.5" = 5, "0.6-0.7" = 5, "0.7-0.8"= 6,"0.8-0.9"= 7,"0.8-1.0"=8))
+
+
+print(TRAp1)
+  ggsave(plot = TRAp1,"/data5/maolp/Main_Gao_ScanpyProject20231130/HFB_Figure_Plot/Main_Figure4/Figure4E_TRA_all_VJcombined.pdf",width = 7,height = 7)
+```
+
+```{r}
+TRAVDJheatmap <- function(data,pattern, TRAinIMGT=TRAIMGTsub ,id_col="AdjustedID", cluster_col = TRUE, cluster_row = TRUE, title = "Organ") {
+  sub_data = data[grep(pattern, data[[id_col]]),]
+  TRAVJ = table(sub_data$TRAVJ) %>% as.data.frame() %>% arrange(desc(Freq))
+  TRAVJ$Per = TRAVJ$Freq / sum(TRAVJ$Freq)*100
+  
+  separated_data <- TRAVJ %>%
+    separate(Var1, into = c("Vgene", "Jgene"), sep = "_")
+  
+  wide_data <- separated_data %>% select(-Freq) %>%
+    spread(key = Vgene, value = Per)
+  
+  rownames(wide_data) <- wide_data$Jgene
+  wide_data <- wide_data[, -1]
+  wide_data[is.na(wide_data)] <- 0
+  missing_cols <- setdiff(TRAinIMGT$IMGT_gene_name, colnames(wide_data))
+  
+  
+  for(col in missing_cols) {
+    wide_data[[col]] <- 0
+  }
+  wide_data<-wide_data[,TRAinIMGT$IMGT_gene_name]
+  pheatmap(wide_data, border_color = "white", color = rev(colorRampPalette(c('#C6403D', "#f6c619","white", '#246BAE'))(100)), cluster_cols = cluster_col, cluster_rows = cluster_row, main = title)
+  return(wide_data)
+}
+```
+
+```{r}
+TRAVDJheatmap(data = subVDJ, pattern = "B", id_col = "AdjustedID",title = "PBMC",cluster_col = F)
+```
+
+# ----TRB----
+
+```{r}
+
+subTRBvdj=subTRBobs2[, c("AdjustedID", "New_Body", colnames(subTRBobs2)[grep("VDJ", colnames(subTRBobs2))])]
+subTRBvdj$TRBvj=paste0(subTRBvdj$IR_VDJ_1_v_call,"_",subTRBvdj$IR_VDJ_1_j_call)
+subTRBvdj$aalength=nchar(subTRBvdj$IR_VDJ_1_junction_aa)
+subTRBvdjlen=table(subTRBvdj$TRBvj,subTRBvdj$aalength) %>% as.data.frame()
+```
+
+
+```{r}
+PBMCTRB_cor_results2$VJgene=paste0(PBMCTRB_cor_results2$Vgene,"_",PBMCTRB_cor_results2$Jgene)
+# intersect(PBMCTRB_cor_results2$VJgene,subset(subTRBvdjlen,Len==17&Freq>median((subset(subTRBvdjlen,Len==17&Freq>0)$Freq)))$VDJ)
+```
+
+
+```{r}
+colnames(subTRBvdjlen)<-c("VDJ","Len","Freq")
+subTRBvdjlen$Percentage=subTRBvdjlen$Freq/sum(subTRBvdjlen$Freq)*100
+
+P2=ggplot(subTRBvdjlen)+geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC TRA", x = "V gene", y = "J gene",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+
+
+#### Plot:len
+
+```{r}
+
+subTRBvdjlen[subTRBvdjlen$VDJ %in% intersect(PBMCTRB_cor_results2$VJgene,subset(subTRBvdjlen,Len==17&Freq>median((subset(subTRBvdjlen,Len==17&Freq>0)$Freq)))$VDJ),] %>%
+  ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                       na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC TRB", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# subTRBvdjlen=table(subTRBvdj$TRBvj,subTRBvdj$aalength) %>% as.data.frame()
+```
+
+
+```{r}
+PBMCTRB_cor_results2$VDJgene=paste0(PBMCTRB_cor_results2$Vgene,"_",PBMCTRB_cor_results2$Jgene)
+TRBlongexpsig=merge(TRBlongexp,PBMCTRB_cor_results2,by.x="Sample",by.y="VDJgene")
+subset(TRBlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10)
+# max_five <- sort(TRBlongexp$Per, decreasing = TRUE) %>% head( 10)
+
+subset(TRBlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subset(TRBlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subTRBsortgene=subset(TRBlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+subTRBvdjlen[subTRBvdjlen$VDJ %in%subTRBsortgene ,] %>% mutate(VDJ=factor(VDJ,levels=rev(subTRBsortgene)))%>%
+  ggplot() +geom_tile(aes(Len,VDJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                                                                                        na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC TRB", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+subTRBvdjlenmax <- subTRBvdjlen %>%
+  group_by(VDJ) %>%
+  mutate(Percentage_max = max(Percentage)) %>%
+  filter(Percentage == Percentage_max)
+m1=merge(subTRBvdjlenmax,TRBlongexpsig,by.x="VDJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VDJ %in% subTRBsortgene,subTRBsortgene,"Others")) 
+m1<-m1[!duplicated(m1$VDJ),]
+length(unique(m1$VDJ))
+m1$VDJcol <- subTRBsortgene[match(m1$VDJ, subTRBsortgene)]
+m1$VDJcol[is.na(m1$VDJcol)] <- "Others TRB V-J"
+table(m1$VDJcol)
+setdiff( subTRBsortgene,m1$VDJ )
+
+library(ggsci)
+
+P3TRBplot=m1%>% mutate(Rcor=ifelse(cor<0,"R<0","R>0")) %>% mutate(VDJcol=factor(VDJcol,levels=c(subTRBsortgene,"Others TRB V-J"))) %>% 
+  ggplot() +
+  geom_point(aes(Len,cor,size=Per,color=VDJcol,shape=Rcor)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC TRB", x = "TRB V-J CDR3 max len", y = " Percentage in All(%)",size="Percentage in TRB V-J(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),aspect.ratio = 0.6)+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))+scale_color_futurama()
+P3TRBplot
+```
+```{r}
+# ggsave(plot=P3TRBplot,"Figure/P3TRBplot.pdf",width = 8,height = 6)
+```
+
+```{r}
+merge(subTRBvdjlen,TRBlongexpsig,by.x="VDJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VDJ %in% subTRBsortgene,subTRBsortgene,"Others")) %>% mutate(Percentage2=ifelse(cor <0,-Percentage,Percentage)) %>% 
+  ggplot() +
+  geom_point(aes(Len,Percentage2,color=VDJcol)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC TRB", x = "VDJ CDR3 max len", y = "Percentage(%)",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))
+```
+
+
+#----TRA----
+```{r}
+subTRAvdj=subTRBobs2[, c("AdjustedID", "New_Body", colnames(subTRBobs2)[grep("VJ", colnames(subTRBobs2))])]
+subTRAvdj$TRAvj=paste0(subTRAvdj$IR_VJ_1_v_call,"_",subTRAvdj$IR_VJ_1_j_call)
+subTRAvdj$aalength=nchar(subTRAvdj$IR_VJ_1_junction_aa)
+subTRAvdjlen=table(subTRAvdj$TRAvj,subTRAvdj$aalength) %>% as.data.frame()
+max(subTRAvdjlen$Percentage)
+colnames(subTRAvdjlen)<-c("VJ","Len","Freq")
+subTRAvdjlen$Percentage=subTRAvdjlen$Freq/sum(subTRAvdjlen$Freq)*100
+```
+
+```{r}
+PlenTRA=ggplot(subTRAvdjlen)+geom_tile(aes(Len,VJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619", '#246BAE')), 
+                                                                                                     na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC TRA", x = "CDR3 Length", y = "J gene",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_blank())
+PlenTRA
+```
+
+```{r}
+# ggsave(plot=PlenTRA,"Figure/PlenTRA.pdf")
+```
+
+```{r}
+PBMCTRA_cor_results2$VJgene[1:10]
+```
+```{r}
+PBMCTRA_cor_results2$VJgene=paste0(PBMCTRA_cor_results2$Vgene,"_",PBMCTRA_cor_results2$Jgene)
+TRAlongexpsig=merge(TRAlongexp,PBMCTRA_cor_results2,by.x="Sample",by.y="VJgene")
+subset(TRAlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10)
+max_five <- sort(TRAlongexp$Per, decreasing = TRUE) %>% head( 10)
+
+subset(TRAlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subset(TRAlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor)
+```
+
+```{r}
+subTRAsortgene=subset(TRAlongexpsig,p.value<0.05) %>% arrange(desc(Per)) %>% head( 10) %>%  arrange(cor) %>% .$Sample
+subTRAvdjlen[subTRAvdjlen$VJ %in%subTRAsortgene ,] %>% mutate(VJ=factor(VJ,levels=rev(subTRAsortgene)))%>%
+  ggplot() +geom_tile(aes(Len,VJ,fill=Percentage),color="white")+  scale_fill_gradientn(colors = rev(c('#C6403D', "#f6c619","white", '#246BAE')), 
+                                                                                         na.value = "white") +
+  theme_minimal() +
+  labs(title = "PBMC TRA", x = "", y = " ",fill="Percentage(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+```
+```{r}
+subTRAvdjlen
+```
+
+```{r}
+subTRAvdjlenmax <- subTRAvdjlen %>%
+  group_by(VJ) %>%
+  mutate(Percentage_max = max(Percentage)) %>%
+  filter(Percentage == Percentage_max)
+m1=merge(subTRAvdjlenmax,TRAlongexpsig,by.x="VJ",by.y="Sample") %>% mutate(VDJcol=ifelse(VJ %in% subTRAsortgene,subTRAsortgene,"Others")) 
+m1<-m1[!duplicated(m1$VJ),]
+length(unique(m1$VJ))
+m1$VDJcol <- subTRAsortgene[match(m1$VJ, subTRAsortgene)]
+m1$VDJcol[is.na(m1$VDJcol)] <- "Others TRA V-J"
+table(m1$VDJcol)
+setdiff( subTRAsortgene,m1$VJ )
+
+library(ggsci)
+
+P3TRAplot=m1%>% mutate(Rcor=ifelse(cor<0,"R<0","R>0")) %>% mutate(VDJcol=factor(VDJcol,levels=c(subTRAsortgene,"Others TRA V-J"))) %>% 
+  ggplot() +
+  geom_point(aes(Len,cor,size=Per,color=VDJcol,shape=Rcor)) + 
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +
+  theme_classic() +
+  labs(title = "PBMC TRA", x = "TRA V-J CDR3 max len", y = " Percentage in All TRA V-J(%)",size="Percentage in TRA V-J(%)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        plot.title = element_text(hjust = 0.5),aspect.ratio = 0.6)+scale_y_continuous(limits = c(-1, 1),breaks = seq(-1,1,0.2))+scale_color_futurama()
+P3TRAplot
+```
+
+```{r}
+# ggsave(plot=P3TRAplot,"Figure/P3TRAplot.pdf")
+```
+
+### 保存加载数据
+
+```{r}
+#2023-12-14 01:43:24
+save.image("DATA/Figure4_TCRallVDJconbined.RData")
+```
+
