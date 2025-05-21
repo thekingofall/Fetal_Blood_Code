@@ -1,0 +1,182 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+# source("~/data5/CommonR/A01-create_project_structure_tpl1.R")
+rm(list = ls())
+```
+
+## 读取数据
+```{r}
+Cell=read.table("../data/processed_data/Bulk/CellAll_count.txt",header = T)
+Cell$Geneid<-substring(Cell$Geneid,1,15)
+```
+
+```{r}
+colnames(Cell)<-gsub('.sorted.bam','',colnames(Cell))
+colnames(Cell)<-gsub('Cell_A03.Alignment.','Z',colnames(Cell))
+colnames(Cell)<-gsub('ZD','D',colnames(Cell))
+colnames(Cell)<-gsub('ZB','B',colnames(Cell))
+colnames(Cell)<-gsub('ZC','C',colnames(Cell))
+```
+
+```{r}
+library(rtracklayer)
+gff <- readGFF("/home/maolp//mao/Ref/AllnewstarRef/Homo/Data/Homo_sapiens.GRCh38.108.gtf")
+mapid_gene <- gff[gff$type == "gene", c("gene_id","transcript_id", "gene_name","transcript_name")]
+```
+```{r}
+HC_genes_counts_merge<-merge(Cell,mapid_gene,by.x="Geneid",by.y="gene_id")
+HC_genes_counts_merge<-HC_genes_counts_merge[which(!is.na(HC_genes_counts_merge$gene_name)),]
+HC_genes_counts_merge<-HC_genes_counts_merge[!duplicated(HC_genes_counts_merge$gene_name),]
+```
+
+```{r}
+countToTpm <- function(counts, effLen)
+{
+  rate <- log(counts) - log(effLen)
+  denom <- log(sum(exp(rate)))
+  exp(rate - denom + log(1e6))
+}
+data=Cell
+```
+
+```{r}
+colnames(HC_genes_counts_merge)
+expdata<-as.data.frame(HC_genes_counts_merge[,-c(1:6,33:35)])
+rownames(expdata)<-HC_genes_counts_merge$gene_name
+expdata_tpm=as.data.frame(apply(expdata, 2, function(x)countToTpm(x,HC_genes_counts_merge$Length))  )
+apply(expdata_tpm, 2, function(x)sum(x))
+```
+
+```{r}
+Sample_MetainRNAseq=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/Last_All_scanpyData/MetaData/Sample_MetainRNAseq.csv")
+```
+
+```{r}
+library(dplyr)
+Sample_MetainRNAseq<-arrange(Sample_MetainRNAseq,AdjustedID)
+Sample_MetainRNAseqZ=Sample_MetainRNAseq[1:17,]
+Sample_MetainRNAseqZ
+```
+```{r}
+Sample2=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/Last_All_scanpyData/MetaData/SampleMeta.csv")
+```
+
+```{r}
+Sample_MetainRNAseq<-arrange(Sample_MetainRNAseq,AdjustedID)
+Sample_MetainRNAseqZ=Sample_MetainRNAseq[1:17,]
+Sample_MetainRNAseqZ
+```
+
+```{r}
+# merge()
+```
+
+```{r}
+Sample_MetainRNAseq$Organ<-substring(Sample_MetainRNAseq$AdjustedID,1,1)
+```
+```{r}
+Sample_MetainRNAseqZ$Group<-ifelse(Sample_MetainRNAseqZ$Week<23,'Early',
+                                   ifelse(Sample_MetainRNAseqZ$Week<=28,"EarlyMiddle",
+                                   ifelse(Sample_MetainRNAseqZ$Week<=34,"Middle",
+                                          ifelse(Sample_MetainRNAseqZ$Week<37,'Late','Enough'))))
+```
+```{r}
+setdiff(Sample_MetainRNAseqZ$Name,Sample2$Name)
+
+```
+```{r}
+# Sample2$Name2<-Sample2$Name
+Sample2$Name<-Sample2$Name %>% gsub("Z07","Z7",.) %>% gsub("Z03","Z3",.)
+```
+
+```{r}
+library(stringr)
+Sample2 <- Sample2 %>%
+  mutate(
+    AdjustedID3 = str_replace(AdjustedID2, "(\\d+\\.\\d+)(_.*)", function(x) {
+      num <- as.numeric(str_extract(x, "\\d+\\.\\d+")) - 2
+      paste0(num, str_extract(x, "(_.*)"))
+    })
+  )
+
+
+print(Sample2)
+Sample2$pcw=Sample2$Week-2
+```
+
+```{r}
+Sample2<-arrange(Sample2,Week)
+BloodSample2<-Sample2[grep("Z",Sample2$Name),]
+
+```
+```{r}
+
+```
+
+### Meta data
+```{r}
+apply(BloodSample2[,6:9], 1, sum)
+BloodMeta=BloodSample2[apply(BloodSample2[,6:9], 1, sum)>3,]
+```
+```{r}
+colnames(BloodMeta)
+BloodMeta$AdjustedID3
+```
+
+```{r}
+BloodMeta$AdjustedID3=BloodMeta$AdjustedID3 %>% gsub("B12_P2","B12.0_P2",.)%>% gsub("B18_P4","B18.0_P4",.)
+```
+
+### 保存BloodMeta.csv
+```{r}
+dir.create("../data/processed_data/Meta")
+write.csv(BloodMeta,"../data/processed_data/Meta/BloodMeta.csv")
+```
+
+```{r}
+S2=merge(Sample_MetainRNAseqZ,Sample2,by="Name")
+```
+
+```{r}
+expdata6=expdata[,S2$Name]
+all(colnames(expdata6)==S2$Name)
+colnames(expdata6)<-S2$AdjustedID3
+```
+
+```{r}
+expdata6_tpm=as.data.frame(apply(expdata6, 2, function(x)countToTpm(x,HC_genes_counts_merge$Length))  )
+```
+
+
+```{r}
+write.csv(expdata6_tpm,"../data/processed_data/Bulk/expdata_tpm.csv")
+```
+
+```{r}
+exp10=expdata6_tpm[rowSums(expdata6_tpm)>10,]
+write.csv(exp10,"../data/processed_data/Bulk/expdata_tpm_sumb10.csv")
+```
+
+```{r}
+exp10_log2TPM=log2(exp10+1)
+write.csv(exp10_log2TPM,"../data/processed_data/Bulk/expdata_tpm_sumb10_log2TPM.csv")
+```
+```{r}
+exp10_log2TPM<-read.csv("../data/processed_data/Bulk/expdata_tpm_sumb10_log2TPM.csv",header = T,row.names = 1)
+```
+```{r}
+exp10_log2TPM
+```
+
+```{r}
+dim(exp10_log2TPM)
+```
+

@@ -1,0 +1,125 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### BloodMeta
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+# write.csv(BloodMeta,)
+BloodMeta<-read.csv("../data/processed_data/Meta/BloodMeta.csv",row.names = 1)
+```
+
+```{r}
+# PlamaOlink=read.csv("../data/processed_data/Plasma_Olink/Plasma_Olink.csv")
+# arrange(PlamaOlink,ID)
+```
+
+### PlamaOlink 
+```{r}
+PlamaOlink=read.csv("../data/processed_data/Plasma_Olink/Plasma_Olink_all.csv")
+arrange(PlamaOlink,ID)
+rownames(PlamaOlink)<-PlamaOlink$ID
+```
+```{r}
+PlamaOlink=PlamaOlink[,BloodMeta$AdjustedID2]
+all(colnames(PlamaOlink)==BloodMeta$AdjustedID2)
+colnames(PlamaOlink)<-BloodMeta$AdjustedID3
+PlamaOlink<-PlamaOlink[!rownames(PlamaOlink)%in% c("GW"),]
+write.csv(PlamaOlink,"../data/processed_data/Plasma_Olink/Blood_PlamaOlink.csv")
+```
+
+```{r}
+PlamaOlink<-t(PlamaOlink) %>% as.data.frame()
+PlamaOlink$sample_id=rownames(PlamaOlink)
+PlamaOlink_long<- melt(PlamaOlink)
+PlamaOlink_long$type<-"Plama_Olink"
+```
+
+### Cell Olink
+
+
+```{r}
+CellOlink=read.csv("../data/processed_data/Cell_Olink/Cell_stimulate_blood_olink.csv")
+# arrange(PlamaOlink,ID)
+rownames(CellOlink)<-CellOlink$Assay
+```
+
+
+```{r}
+CellOlink=CellOlink[,colnames(CellOlink) %in% BloodMeta$AdjustedID2]
+```
+
+```{r}
+BloodMeta2=BloodMeta
+rownames(BloodMeta2)<-BloodMeta2$AdjustedID2
+```
+
+
+```{r}
+# subset(BloodMeta,)
+BloodMeta2=BloodMeta2[colnames(CellOlink),]
+all(BloodMeta2$AdjustedID2==colnames(CellOlink))
+colnames(CellOlink)<-BloodMeta2$AdjustedID3
+```
+
+```{r}
+CellOlink<-CellOlink[!rownames(CellOlink)%in% c("GW"),]
+```
+```{r}
+write.csv(CellOlink,"../data/processed_data/Cell_Olink/Blood_Cell_stimulate_olink.csv")
+```
+
+```{r}
+CellOlink<-t(CellOlink) %>% as.data.frame()
+CellOlink$sample_id=rownames(CellOlink)
+CellOlink_long<- melt(CellOlink)
+CellOlink_long$type<-"Cell_stimulate_Olink"
+```
+
+### flow
+```{r}
+flowCD45=read.csv("../data/processed_data/Flow/Blood/Flow_Blood_Freq.csv")
+
+rownames(flowCD45)<-flowCD45$Cell.type
+flowCD45<-flowCD45[,-1]
+FlowCD45=flowCD45[,BloodMeta$AdjustedID3]
+```
+
+```{r}
+FlowCD45<-t(FlowCD45) %>% as.data.frame()
+FlowCD45$sample_id=rownames(FlowCD45)
+FlowCD45_long<- melt(FlowCD45)
+FlowCD45_long$type<-"Sflow_Freq_inParent"
+```
+### Bulk
+```{r}
+Bulk_log2TPM<-read.csv("../data/processed_data/Bulk/expdata_tpm_sumb10_log2TPM.csv",header = T,row.names = 1)
+
+Bulk_log2TPM<-Bulk_log2TPM[rowSums(Bulk_log2TPM)>100,]
+Bulk_log2TPM<-t(Bulk_log2TPM) %>% as.data.frame()
+```
+```{r}
+rownames(Bulk_log2TPM)<-gsub("B18_P4","B18.0_P4",rownames(Bulk_log2TPM))
+```
+
+
+```{r}
+Bulk_log2TPM$sample_id=rownames(Bulk_log2TPM)
+Bulk_log2TPM_long<- melt(Bulk_log2TPM)
+Bulk_log2TPM_long$type<-"Cell_stimulate_BulkRNA"
+```
+
+```{r}
+
+```
+

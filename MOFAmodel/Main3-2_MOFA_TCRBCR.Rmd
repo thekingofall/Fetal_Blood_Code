@@ -1,0 +1,217 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+SampleMeta=read.csv("~/Main_Gao_ScanpyProject20231130/MOFA/MOFAR/data/processed_data/Meta/BloodMeta.csv",row.names = 1)
+```
+```{r}
+# colnames(data_long)
+```
+
+```{r}
+
+library(dplyr)
+
+file_paths <- list(
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_BCRHV_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_IGHD_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_IGHJ_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_IGKJJ_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_IGLJJ_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_subBCRKV_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/BCRTCRchain/PBMC_subBCRLV_chainlong.csv"
+)
+
+data_list <- lapply(file_paths, read.csv)
+merged_data <- bind_rows(data_list)
+
+print(head(merged_data))
+Bmerged_df<-merged_data[grep("_B",merged_data$Sample),]
+Bmerge <- separate(Bmerged_df, Sample, into = c("type", "sample_id"), sep = "_", extra = "merge")
+Bmerge$type<-"BCRgene" 
+column_names <- c("sample_id", "variable", "value", "type")
+Bmerge=Bmerge[,column_names]
+Bmerge
+```
+
+```{r}
+Bmerge_wide <- Bmerge %>%
+  dplyr::select(-type) %>% 
+  pivot_wider(names_from = variable, values_from = value) %>% as.data.frame()
+rownames(Bmerge_wide )<-Bmerge_wide$sample_id
+Bmerge_wide<-Bmerge_wide[,-1]
+Bmerge_wide<-Bmerge_wide[,colSums(Bmerge_wide)>0]
+library(dplyr)
+library(tibble)
+Bmerge_long <- Bmerge_wide %>%
+  rownames_to_column(var = "sample_id") %>% 
+  pivot_longer(cols = -sample_id, names_to = "variable", values_to = "value")
+Bmerge_long$type="BCR"
+```
+```{r}
+unique(Bmerge_long$variable)
+```
+
+```{r}
+Bmerge=Bmerge_long
+```
+
+```{r}
+# Bgene=read.csv("/home/maolp/Main_Gao_ScanpyProject20231130/HFB_script_in_save/BCRgene/IGHV.txt",sep = "\t")
+```
+```{r}
+Bmerge
+```
+
+
+
+```{r}
+Bmerge=Bmerge[Bmerge$sample_id %in% SampleMeta$AdjustedID3,]
+length(unique(Bmerge$sample_id))
+```
+
+```{r}
+BCRobs=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/BCRFigure/BCRF1.obs.csv")
+```
+
+```{r}
+BCRHCDR3=BCRobs
+unique(BCRHCDR3$Last_cell_type)
+
+BCRHCDR3_CDR3=prop.table(table(BCRHCDR3$AdjustedID,nchar(BCRHCDR3$IR_VDJ_1_junction_aa)))
+colnames(BCRHCDR3_CDR3)=paste0("BCRHCDR3_CDR3b_","length","_",colnames(BCRHCDR3_CDR3))
+
+BCRHCDR3_CDR3_df =BCRHCDR3_CDR3 %>% as.data.frame()
+
+
+BCRHCDR3_CDR3_filtered_df <- BCRHCDR3_CDR3_df %>%
+  group_by(Var2) %>%
+  filter(sum(Freq) != 0) %>%
+  ungroup()
+
+
+
+BCRHCDR3_CDR3_filtered_df$type="BCR"
+colnames(BCRHCDR3_CDR3_filtered_df)= c("sample_id", "variable", "value", "type")
+print(BCRHCDR3_CDR3_filtered_df)
+```
+
+```{r}
+Bmerge=rbind(Bmerge,BCRHCDR3_CDR3_filtered_df)
+unique(Bmerge$variable)
+```
+
+
+```{r}
+dir.create("../data/processed_data/TCRBCR",showWarnings = F)
+write.csv(Bmerge,"../data/processed_data/TCRBCR/Bmerge.csv")
+```
+
+
+```{r}
+"/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/BCRFigure/BCRF1.obs.csv"
+```
+
+```{r}
+# 文件路径列表
+file_paths <- c(
+  "/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRA_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRAJ_long.csv",
+  "/home/maolp/Allcount/All_scanpyData/TCRchain/CD48TCRBJ_long.csv",
+  "/home/maolp/Allcount/All_scanpyData/TCRchain/TCRBD_chainlong.csv",
+  "/home/maolp/Allcount/All_scanpyData/TCRchain/TCRH_chainlong.csv"
+)
+
+# 初始化一个空的数据框
+merged_df <- data.frame()
+
+# 读取并合并所有文件
+for (file in file_paths) {
+  df <- read.csv(file)
+  merged_df <- rbind(merged_df, df)
+}
+
+# 打印合并后的数据框
+print(merged_df)
+Tmerged_df<-merged_df[grep("_B",merged_df$Sample),]
+Tmerge <- separate(Tmerged_df, Sample, into = c("type", "sample_id"), sep = "_", extra = "merge")
+unique(Tmerge$type)
+Tmerge <- Tmerge %>%
+  mutate(type = case_when(
+    type == "Naïve CD4 T" ~ "CD4TCR",
+    type == "Naïve CD8 T" ~ "CD8TCR",
+    TRUE ~ type
+  ))
+Tmerge=Tmerge[,column_names]
+Tmerge=Tmerge[Tmerge$sample_id %in% SampleMeta$AdjustedID3,]
+length(unique(Tmerge$sample_id))
+write.csv(Tmerge,"../data/processed_data/TCRBCR/Tmerge.csv")
+```
+
+```{r}
+Tmerge<- Tmerge %>%
+  group_by(variable) %>%
+  filter(sum(value) != 0) %>%
+  ungroup()
+```
+
+```{r}
+TCR=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/TCRFigure/TCRobs.csv")
+TCR=TCR[TCR$AdjustedID %in% SampleMeta$AdjustedID3, ]
+```
+```{r}
+CD4=TCR[grep("CD4",TCR$Last_cell_type),]
+unique(CD4$Last_cell_type)
+
+CD4_CDR3=prop.table(table(CD4$AdjustedID,nchar(CD4$IR_VDJ_1_junction_aa)))
+colnames(CD4_CDR3)=paste0("CD4_CDR3b_","length","_",colnames(CD4_CDR3))
+
+CD4_CDR3_df =CD4_CDR3 %>% as.data.frame()
+
+
+CD4_CDR3_filtered_df <- CD4_CDR3_df %>%
+  group_by(Var2) %>%
+  filter(sum(Freq) != 0) %>%
+  ungroup()
+
+
+print(CD4_CDR3_filtered_df)
+CD4_CDR3_filtered_df$type="CD4TCR"
+colnames(CD4_CDR3_filtered_df)= c("sample_id", "variable", "value", "type")
+```
+
+```{r}
+CD8=TCR[grep("CD8",TCR$Last_cell_type),]
+unique(CD8$Last_cell_type)
+
+CD8_CDR3=prop.table(table(CD8$AdjustedID,nchar(CD8$IR_VDJ_1_junction_aa)))
+colnames(CD8_CDR3)=paste0("CD8_CDR3b_","length","_",colnames(CD8_CDR3))
+
+CD8_CDR3_df =CD8_CDR3 %>% as.data.frame()
+
+
+CD8_CDR3_filtered_df <- CD8_CDR3_df %>%
+  group_by(Var2) %>%
+  filter(sum(Freq) != 0) %>%
+  ungroup()
+
+CD8_CDR3_filtered_df$type="CD8TCR"
+
+colnames(CD8_CDR3_filtered_df)= c("sample_id", "variable", "value", "type")
+print(CD8_CDR3_filtered_df)
+```
+```{r}
+Tlastmerge=rbind(Tmerge,CD4_CDR3_filtered_df,CD8_CDR3_filtered_df)
+```
+
+```{r}
+write.csv(Tlastmerge,"../data/processed_data/TCRBCR/Tmerge.csv")
+```
+

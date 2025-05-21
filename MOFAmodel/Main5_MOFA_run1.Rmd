@@ -1,0 +1,922 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+```{r}
+library(dplyr)
+library(stringr)
+# library(tidyverse)
+```
+
+```{r}
+data_long=read.csv("../output/tables/Combined_Data_Alldata_long_norm.csv",row.names = 1) 
+  # data_long=fread("~/Main_Gao_ScanpyProject20231130/MOFA/MOFAR//output/tables/Combined_Data_Alldata_long_norm.csv") %>% 
+# data_long <- sample_n(data_long, 100000)
+unique(data_long$sample_id)
+```
+
+
+```{r}
+data_long=data_long[!grepl("__RPS|__RPL|^RP",data_long$variable),]
+```
+```{r}
+table(data_long$type,data_long$sample_id)
+```
+
+```{r}
+final_data_long_backup = data_long
+```
+```{r}
+final_data_long_backup[grep("IGK",final_data_long_backup$variable),]
+```
+
+```{r}
+final_data_long = final_data_long_backup
+```
+
+```{r}
+final_data_long$cell_type = NULL
+final_data_long$variable_transformed = NULL
+```
+
+```{r}
+final_data_long$type[ final_data_long$type == 'single_cell'] = str_extract(final_data_long$variable[ final_data_long$type == 'single_cell'] , '.*__')
+```
+
+```{r}
+final_data_long$config = NULL
+```
+
+```{r}
+final_data_long$X = NULL
+```
+
+```{r}
+samples = unique(final_data_long$sample_id)
+```
+
+```{r}
+data_list = list()
+```
+
+
+```{r}
+head(final_data_long,2)
+```
+```{r}
+final_data_long$variable<-gsub("Vδ","VD",final_data_long$variable)
+final_data_long$variable<-gsub("Naïve","Naive",final_data_long$variable)
+final_data_long$variable<-gsub("Naïve","Naive",final_data_long$variable)
+final_data_long$variable<-gsub("γδ","gd",final_data_long$variable)
+
+```
+
+```{r}
+unique(final_data_long$sample_id)
+```
+
+```{r}
+
+unique(final_data_long$value)
+unique(final_data_long$type)
+final_data_long$type<-gsub("\\.","x",final_data_long$type)
+final_data_long$type<-gsub("Naïve","Naive",final_data_long$type)
+```
+
+
+```{r}
+# unique(final_data_long$variable)
+```
+
+```{r}
+data_list <- list()
+```
+```{r}
+dim(final_data_long)
+```
+
+
+```{r}
+library(reshape2)
+for(i in unique(final_data_long$type)){
+    data = final_data_long[final_data_long$type == i, ]
+    
+    data$type = NULL
+    data$cell_type = NULL
+    
+    data = data %>% reshape2::dcast(variable ~ sample_id, value  = "value")
+    rownames(data) = data$variable
+    colnames(data) = str_replace(colnames(data), 'value\\.', '')
+    data$variable = NULL
+    
+    data[setdiff( samples, names(data))] = NA  # use all samples
+    
+    data = data[,order(colnames(data))]
+    data = data[,colnames(data) %in% samples]
+    
+    data_list[[i]] = as.matrix(data)
+    }
+```
+
+```{r}
+names(data_list) = str_replace_all(names(data_list) , '__|\\.|\\.\\.|\\.\\.\\.', '')
+```
+
+```{r}
+data_list_orig = data_list
+# data_list$BCR <- NULL
+# data_list$CD4TCR <- NULL
+# data_list$CD8TCR <- NULL
+# data_list$Sflow_Freq_inParent <- NULL
+data_list$CD56highCD16low_NK <- NULL
+
+# 打印删除后的 data_list
+print("Updated data_list:")
+# print(data_list)
+```
+
+
+```{r}
+library(MOFA2)
+MOFAobject = create_mofa(data_list)
+# MOFAobject@samples_metadata$group<-MOFAobject@samples_metadata$sample
+```
+```{r}
+options(repr.plot.width=30, repr.plot.height=20)
+mofa_overview = plot_data_overview(MOFAobject)
+mofa_overview
+```
+
+```{r}
+length(unique(data_long$variable))
+```
+
+```{r}
+mofa_overview
+```
+
+```{r}
+# MOFAobject = create_mofa(data_list_orig )
+```
+
+```{r}
+mefisto_opts = get_default_mefisto_options(MOFAobject)
+```
+
+```{r}
+data_opts = get_default_data_options(MOFAobject)
+```
+
+```{r}
+data_opts
+```
+
+```{r}
+data_opts$scale_views = TRUE # decide whether to scale the data
+```
+
+```{r}
+model_opts = get_default_model_options(MOFAobject)
+model_opts
+```
+```{r}
+model_opts$num_factors = 16 # define number of factors
+```
+```{r}
+train_opts  = get_default_training_options(MOFAobject)
+train_opts
+```
+
+```{r}
+train_opts$maxiter = 50000
+```
+
+```{r}
+train_opts$verbose = TRUE
+```
+
+```{r}
+train_opts$seed = 2024
+```
+
+```{r}
+train_opts$weight_views = FALSE
+```
+
+
+```{r}
+stoch_options = get_default_stochastic_options(MOFAobject)
+```
+
+```{r}
+stoch_options
+```
+
+```{r}
+MOFAobject = prepare_mofa(
+  object = MOFAobject,
+  data_options = data_opts,
+  model_options = model_opts,
+  mefisto_options = mefisto_opts,
+  training_options = train_opts #,
+  #stochastic_options = stoch_options
+)
+```
+```{r}
+model_name = paste0("MOFA_MODEL_Fetal_", '_', "WF",'.hdf5')
+```
+
+```{r}
+# library(reticulate)
+# use_condaenv("mofapy2_env", conda = "~/mambaforge-pypy3/bin/conda", required = TRUE)
+# py_config()
+```
+
+```{r}
+model_name="MOFA_MODEL_Fetal.hdf5"
+outfile = file.path( paste0("../output/tables/",  model_name) )
+```
+
+```{r}
+saveRDS(MOFAobject,"../data/processed_data/MOFAobject.rds")
+```
+
+```{r}
+library(MOFA2)
+MOFAobject.trained = run_mofa(MOFAobject, outfile )
+```
+
+```{r}
+model <- load_model(outfile, verbose = TRUE)
+```
+
+```{r}
+model@dimensions$D
+```
+
+```{r}
+sum(model@dimensions$D)
+```
+
+```{r}
+head(model@samples_metadata, n=3)
+```
+```{r}
+model@cache[["variance_explained"]]$r2_total
+```
+
+```{r}
+rowMeans(model@cache$variance_explained$r2_per_factor[[1]])
+```
+
+```{r}
+# Variance explained for every factor in per view and group
+model@cache$variance_explained$r2_per_factor[[1]] # group 1, can be summarized per column but not per Factor
+```
+```{r}
+data = model@cache$variance_explained$r2_per_factor[[1]]
+```
+
+```{r}
+slotNames(MOFAobject)
+```
+
+```{r}
+# plot_variance_explained(MOFAobject, x="group1", y="factor")
+```
+
+```{r}
+plot_data_overview(model)
+```
+```{r}
+     Xr2_list <- calculate_variance_explained(model, factors = "all")
+
+Xr2_list$r2_per_factor$group1 %>% as.data.frame() %>% pheatmap::pheatmap(cluster_rows = F,cluster_cols = F)
+```
+```{r}
+library(ggplot2)
+Xp=plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+Xp$data
+```
+```{r}
+Xp=plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+Xp$data
+Xp$data$group<-NULL
+Factor_long <- Xp$data
+library(tidyverse)
+Factor_wide <- Factor_long %>%
+  pivot_wider(names_from = view, values_from = value) %>% as.data.frame()
+
+rownames(Factor_wide )<-Factor_wide$factor
+row_sums <- rowSums(Factor_wide[,-1])
+col_sums <- colSums(Factor_wide[,-1])
+```
+
+
+```{r}
+Xp=plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+Xp$data
+Xp$data$group<-NULL
+Factor_long <- Xp$data
+
+# 将数据转换为宽格式
+Factor_wide <- Factor_long %>%
+  pivot_wider(names_from = view, values_from = value) %>% as.data.frame()
+
+rownames(Factor_wide )<-Factor_wide$factor
+row_sums <- rowSums(Factor_wide[,-1])
+col_sums <- colSums(Factor_wide[,-1])
+ggplot(filter(Factor_long, factor == "Factor3")) +
+  geom_bar(aes(x = view, y = value,fill=value), stat = "identity") +
+  labs(title = "Factor3 Values by View",
+       x = "View",
+       y = "Var%") +
+  theme_classic()+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+```{r}
+# ggplot(Factor_long)+geom_point(aes(x=""))
+```
+
+```{r}
+library(ggplot2)
+plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+```{r}
+plot_variance_explained(model, x="group", y="factor", plot_total = T)[[1]]+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+```{r}
+plot_variance_explained(model, x="group", y="factor", plot_total = T)[[2]]+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+```{r}
+samples_metadata(model)$pcw= as.numeric(substring(samples_metadata(model)$sample,2,5))
+samples_metadata(model)$condition= ifelse(as.numeric(substring(samples_metadata(model)$sample,2,5))>26,"late","Early")
+
+```
+
+
+```{r}
+
+samples_metadata(model)$condition2 <- cut(samples_metadata(model)$pcw,
+                                        breaks = c(10, 20, 30, 40),
+                                        labels = c('10-20', '20-30', '30-40'),
+                                        include.lowest = TRUE)
+
+print(samples_metadata(model))
+```
+
+```{r}
+plot_factor(model, 
+  factor = 1:7,
+  color_by = "pcw",
+  shape_by = "condition2"
+)
+```
+
+
+```{r}
+plot_factor(model, 
+  factor = 1:7,
+  color_by = "pcw",
+  shape_by = "condition"
+)
+```
+```{r}
+plot_variance_explained(model, x="group", y="factor", plot_total = T)[[2]]
+```
+```{r}
+p <- plot_factor(model, 
+  factors = c(1,2,3),
+  color_by = "condition",
+  dot_size = 3,        # change dot size
+  dodge = T,           # dodge points with different colors
+  legend = F,          # remove legend
+  add_violin = T,      # add violin plots,
+  violin_alpha = 0.25  # transparency of violin plots
+)
+
+# The output of plot_factor is a ggplot2 object that we can edit
+p <- p + 
+  scale_color_manual(values=c("Early"="black", "late"="red")) +
+  scale_fill_manual(values=c("Early"="black", "late"="red"))
+
+print(p)
+
+```
+
+```{r}
+model@expectations$Z
+```
+
+```{r}
+p2 <- plot_factor(model, 
+  factors = 1:15,
+  color_by = "condition",
+  dot_size = 3,        
+  dodge = T,          
+  legend = F,          
+  add_violin = T,      
+  violin_alpha = 0.25  
+)
+p2 
+```
+```{r}
+Pdata=p2$data
+Pdata$pcw=substring(Pdata$sample,2,5) %>% as.numeric()
+filter(Pdata,factor=="Factor3") %>% ggplot()
+```
+
+
+
+```{r}
+library(ggplot2)
+library(ggplot2)
+library(dplyr)
+
+cor_test <- cor.test(Pdata$value[Pdata$factor == "Factor3"], Pdata$pcw[Pdata$factor == "Factor3"], method = "spearman")
+
+correlation <- cor_test$estimate
+
+p_value <- cor.test(Pdata$value, Pdata$pcw, method = "spearman")$p.value
+
+q_value <- p.adjust(p_value, method = "fdr")
+
+scatter_plot <- filter(Pdata, factor == "Factor3") %>%
+  ggplot(aes(x = pcw, y = value)) +
+  geom_point(color = "blue", shape = 1, size = 3) +
+  geom_smooth(method = "lm", se = TRUE, color = "blue", fill = "lightblue", alpha = 0.3) +
+  annotate("text", x = -Inf, y = Inf, label = paste("R =", round(correlation, 2)), 
+           hjust = -0.1, vjust = 1.1, size = 5, color = "black") +
+  annotate("text", x = -Inf, y = Inf, label = paste("P =", format(p_value, scientific = TRUE, digits = 3), "\nQ =", format(q_value, scientific = TRUE, digits = 3)), 
+           hjust = -0.1, vjust = 2.2, size = 5, color = "black") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none"
+  )
+
+scatter_plot
+```
+
+```{r}
+scatter_plot <- filter(Pdata,factor=="Factor3") %>% ggplot( aes(x = pcw, y = value)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  labs(title = "Spearman Correlation: Factor3 vs Sample",
+       x = "Sample (Numeric)",
+       y = "Value") +
+  theme_minimal()
+scatter_plot 
+```
+
+```{r}
+Pdata=p2$data
+Pdata$pcw=substring(Pdata$sample,2,5) %>% as.numeric()
+result1 <-Pdata %>%
+  group_by(factor) %>%
+  summarise(
+    r = cor.test(value, pcw, method = "spearman")$estimate,
+    p = cor.test(value, pcw, method = "spearman")$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(q = p.adjust(p, method = "BH"))
+
+result1
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+Pdata <- p2$data
+Pdata$pcw <- substring(Pdata$sample, 2, 5) %>% as.numeric()
+
+result1 <- Pdata %>%
+  group_by(factor) %>%
+  summarise(
+    r = cor.test(value, pcw, method = "spearman")$estimate,
+    p = cor.test(value, pcw, method = "spearman")$p.value,
+    .groups = 'drop'
+  ) %>%
+  mutate(q = p.adjust(p, method = "BH"))
+
+print(result1)
+
+factor3_result <- result1 %>% filter(factor == "Factor3")
+correlation <- factor3_result$r
+p_value <- factor3_result$p
+q_value <- factor3_result$q
+
+F3scatter_plot <- filter(Pdata, factor == "Factor3") %>%
+  ggplot(aes(x = pcw, y = value)) +
+  geom_point(color = '#272E6A', shape = 21, size = 2, stroke = 1.2) +
+  geom_smooth(method = "lm", se = TRUE, color = '#272E6A', fill = "lightblue", alpha = 0.3) +
+  annotate("text", x = -Inf, y = Inf, label = sprintf("Spearman R = %.2f\n  p = %.5f\n  q = %.5f", correlation, p_value, q_value),
+           hjust = -0.1, vjust = 1, size = 3, color = "black", lineheight = 1.2) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none",aspect.ratio = 1
+  ) +
+  ylab("Factor3 value")
+
+F3scatter_plot
+
+```
+```{r}
+  ggsave(plot = F3scatter_plot,"../output/plots/MOFA/F4_factor_spearman_withpcw.pdf",width = 3,height = 3)
+```
+
+```{r}
+factors_wide <- get_factors(model, as.data.frame = F)$group1 %>% data.frame()
+head(factors_wide, n=3)
+factors_wide$pcw=substring(rownames(factors_wide),2,5) %>% as.numeric()
+factors_wide$condition=ifelse(factors_wide$pcw<26,"Early","Late")
+ggplot(factors_wide)+geom_point(aes(Factor2,Factor3,color=pcw),size=3)+theme_classic()+scale_colour_viridis_b()
+# ggplot(factors_wide)+geom_point(aes(Factor3,Factor4,color=pcw),size=3)+theme_classic()+scale_colour_viridis_b()
+ggplot(factors_wide)+geom_point(aes(Factor2,Factor3,color=condition),size=3)+theme_classic()
+ggplot(factors_wide) +
+  geom_point(aes(Factor2, Factor1, color = condition), size = 3) +
+  stat_ellipse(aes(Factor2, Factor3, color = condition), level = 0.4) +
+  theme_classic()
+```
+```{r}
+library(ggplot2)
+library(reshape2)
+library(viridis)
+
+
+cor_matrix <- cor(factors_wide[,-ncol(factors_wide)], method = "spearman")
+
+melted_cor_matrix <- melt(cor_matrix)
+
+ggplot(data = melted_cor_matrix, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis(name = "Spearman Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(title = "Spearman Correlation Heatmap", x = "Variables", y = "Variables")
+```
+
+```{r}
+ggplot(factors_wide)+geom_point(aes(pcw,Factor3,color=pcw),size=3)+theme_classic()+scale_colour_viridis_b()
+```
+
+```{r}
+set.seed(2024)
+# model <- run_umap(model)
+# model2 <- run_tsne(model)
+```
+
+```{r}
+# plot_data_heatmap(model,
+#   view = "BCR",         # view of interest
+#   factor = 3,             # factor of interest
+#   features = 20,          # number of features to plot (they are selected by weight)
+#   
+#   # extra arguments that are passed to the `pheatmap` function
+#   cluster_rows = TRUE, cluster_cols = FALSE,
+#   show_rownames = TRUE, show_colnames = TRUE,border="white"
+# )
+```
+```{r}
+
+```
+```{r}
+filter(result1,factor=="Factor3")
+```
+
+```{r}
+create_qplot <- function(df) {
+
+  df$qvalue <- cut(df$q,
+                   breaks = c(0, 0.0001, 0.001, 0.01, 0.05, Inf),
+                   labels = c('< 0.0001', '0.0001-0.001', '0.001-0.01', '0.01-0.05', '> 0.05'),
+                   include.lowest = TRUE)
+ 
+  colors <- c('< 0.0001' = '#F6313E', '0.0001-0.001' = '#FF7F50', '0.001-0.01' = "#f6c619", '0.01-0.05' = "#999933", '> 0.05' = '#00AF99')
+  
+  plot <- ggplot(df, aes(x = reorder(factor, r), y = r, fill = qvalue, label = factor)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = colors) +
+    theme_classic() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.line.x = element_blank(),
+      axis.line.y = element_line(color = "black", size = 0.5)
+    ) +
+    labs(x = "Gene", y = "R value with pcw (Spearman)", fill = "q value") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.5) +
+    geom_text(aes(y = ifelse(r > 0, -0.01, 0.01), angle = 90), hjust = ifelse(df$r > 0, 1, 0), vjust = 0.5) +
+    xlab('') + scale_y_continuous(breaks = seq(-1, 1, 0.2), labels = seq(-1, 1, by = 0.2)) 
+  
+  return(plot)
+}
+create_qplot(result1)
+ggsave("../output/plots/MOFA/F3_factor_spearman_withpcw.pdf")
+```
+
+```{r}
+p <- ggplot(result1, aes(x = factor, y = r, fill = q)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Spearman correlation q-values by factor",
+       x = "Factor",
+       y = "q-value") +
+  theme(legend.position = "none")
+
+# 显示图像
+print(p)
+```
+
+
+```{r}
+library(MOFA2)
+mofa=model
+plot_factor_cor(mofa)
+```
+
+```{r}
+library(ggplot2)
+plot_variance_explained(mofa, max_r2 = 50) +theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+```{r}
+plot_variance_explained(mofa, plot_total = TRUE)[[2]]+theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+```{r}
+Tregp1=plot_top_weights(mofa, 
+  view =names(data_list)[c(4,8:25)], 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 15,
+)
+Tregp1
+```
+```{r}
+TNaive_CD8_T=plot_top_weights(mofa, 
+  view = "Naive_CD8_T", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 15,
+)
+```
+```{r}
+library(ggpubr)
+r2 <- mofa@cache$variance_explained$r2_per_factor[[1]]
+library(data.table)
+r2.dt <- r2 %>%
+  as.data.table %>% .[,factor:=as.factor(1:mofa@dimensions$K)] %>%
+  melt(id.vars=c("factor"), variable.name="view", value.name = "r2") %>%
+  .[,cum_r2:=cumsum(r2), by="view"]
+
+P6=ggline(r2.dt, x="factor", y="cum_r2", color="view") +
+  labs(x="Factor number", y="Cumulative variance explained (%)") +
+  theme(
+    legend.title = element_blank(), 
+    legend.position = "top",
+    axis.text = element_text(size=rel(0.8))
+  )
+P6
+```
+```{r}
+p <- plot_factors(mofa, 
+  factors = c(2,3), 
+  color_by = "condition", 
+  dot_size = 4
+) 
+p
+```
+```{r}
+p + 
+  # geom_density_2d(aes_string(color="color_by")) +
+  stat_ellipse(aes(color=color_by), geom = "polygon", alpha=0.25,level = 0.6)
+ggsave("../output/plots/MOFA/F5_factor23_group.pdf")
+```
+```{r}
+plot_factor(mofa, 
+  factor = 1:10, 
+  color_by = "pcw", 
+  dot_size = 4,
+  dodge = TRUE,
+  stroke = 0.4,
+  add_violin = T,
+  add_boxplot = T
+) +
+
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+```
+```{r}
+plot_weights_fn <- function(mofa, factor=1, view=1, nfeatures=10) {
+  p1 <- plot_weights(mofa, 
+    factors = factor, 
+    view = view,
+    nfeatures = nfeatures,
+    text_size = 4
+  )
+  
+  p2 <- plot_top_weights(mofa, 
+    factors = factor, 
+    view = view,
+    nfeatures = nfeatures
+  )
+  
+  p <- cowplot::plot_grid(plotlist=list(p1,p2), nrow=1)
+  return(p)
+}
+plot_weights_fn(mofa, factor=1, view="Naive_CD8_T", nfeatures=8)
+```
+```{r}
+plot_data_heatmap(mofa, 
+  factor = 3, 
+  view = "Naive_CD8_T", 
+  features = 30,
+  denoise = TRUE,
+  cluster_rows = T, cluster_cols = F,
+  show_colnames = T, show_rownames = T,
+  annotation_samples = "condition",  
+  annotation_legend = F,
+  scale = "row",border="white"
+)
+
+```
+```{r}
+
+correlate_factors_with_covariates(mofa, 
+  covariates =c("pcw"),
+  plot = "r",  
+)
+```
+
+```{r}
+  W1 <- get_weights(mofa, factors =3, views = view, 
+        as.data.frame = TRUE)
+```
+
+```{r}
+TNaive_CD8_T=plot_top_weights(mofa, 
+  view = "Naive_CD8_T", 
+  factors = 3, 
+  sign = "negative",
+  nfeatures = 15,
+)
+```
+
+```{r}
+DTreg=data_list["Naive_CD8_T"]$Naive_CD8_T
+DTreg[rownames(DTreg)%in% TNaive_CD8_T$data$feature,]
+pheatmap::pheatmap(DTreg[rownames(DTreg)%in% TNaive_CD8_T$data$feature,],cluster_rows = F,cluster_cols = F,border_color = "white")
+```
+```{r}
+DTreg=data_list["Treg"]$Treg
+DTreg[rownames(DTreg)%in% Tregp1$data$feature,]
+pheatmap::pheatmap(DTreg[rownames(DTreg)%in% Tregp1$data$feature,],cluster_rows = F,cluster_cols = F,border_color = "white")
+```
+
+```{r}
+plot_top_weights(mofa, 
+  view = "MEMP", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 15,
+)
+```
+```{r}
+plot_top_weights(mofa, 
+  view = "Plama_Olink", 
+  factors = 3, 
+  sign = "negative",
+  nfeatures = 15,
+)
+plot_top_weights(mofa, 
+  view = "Plama_Olink", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 15,
+)
+```
+
+```{r}
+plot_weights(mofa, 
+  view = "Plama_Olink", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+```{r}
+plot_weights(mofa, 
+  view = "Sflow_Freq_inParent", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+
+```{r}
+plot_weights(mofa, 
+  view = "Cell_stimulate_Olink", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+
+```{r}
+plot_weights(mofa, 
+  view = "Treg", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+```{r}
+plot_weights(mofa, 
+  view = "MEMP", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+```{r}
+plot_weights(mofa, 
+  view = "CD4TCR", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+```{r}
+X=plot_top_weights(mofa, 
+  view = "CD4TCR", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 6,
+)
+X
+```
+
+```{r}
+plot_weights(mofa, 
+  view = "BCR", 
+  factors = 3, 
+  nfeatures = 10, 
+  text_size = 4
+)
+```
+
+```{r}
+X=plot_top_weights(mofa, 
+  view = "BCR", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 6,
+)
+X
+```
+
+```{r}
+X=plot_top_weights(mofa, 
+  view = "HSC_MPP", 
+  factors = 1, 
+  sign = "negative",
+  nfeatures = 20,
+)
+X
+XT=data_list["HSC_MPP"]$HSC_MPP
+pheatmap::pheatmap(XT[rownames(XT)%in% X$data$feature,],cluster_rows = F,cluster_cols = F,border_color = "white")
+```
+```{r}
+plot_top_weights
+```
+
+
+```{r}
+X=plot_top_weights(mofa, 
+  view = "HSC_MPP", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 20,
+)
+X
+XT=data_list["HSC_MPP"]$HSC_MPP
+pheatmap::pheatmap(XT[rownames(XT)%in% X$data$feature,],cluster_rows = F,cluster_cols = F,border_color = "white")
+```

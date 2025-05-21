@@ -1,0 +1,536 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Bloodscmeta
+
+```{r}
+rm(list=ls())
+```
+
+
+```{r}
+Bloodscmeta=read.csv("../data/processed_data/SingleRNA/Blood_ScMeta.csv")
+```
+```{r}
+table(Bloodscmeta$Last_cell_type)>500
+```
+```{r}
+unique(Bloodscmeta$Cell_lineage)
+```
+```{r}
+library(dplyr)
+
+filtered_data <- Bloodscmeta %>%
+  filter(Cell_lineage != "MK/ERY", Cell_lineage != "OTHERS") %>%
+  group_by(Last_cell_type) %>%
+  filter(n() > 500) %>%
+  ungroup()
+```
+
+```{r}
+unique(filtered_data$AdjustedID)
+```
+
+
+
+
+```{r}
+samplesmeta=read.csv("../data/processed_data/Meta/BloodMeta.csv")
+```
+```{r}
+# Bloodscmeta<-Bloodscmeta[Bloodscmeta$AdjustedID %in% samplesmeta$AdjustedID3,]
+```
+
+```{r}
+library(dplyr)
+
+filtered_data <- Bloodscmeta %>%
+  filter(Cell_lineage != "MK/ERY", Cell_lineage != "OTHERS") %>%
+  filter(Last_cell_type != "abT(entry)") %>%
+  group_by(Last_cell_type) %>%
+  filter(n() > 500) %>%
+  ungroup()
+
+table_data <- table(filtered_data$AdjustedID, filtered_data$Last_cell_type)
+
+apply(table_data, 2,sum)
+valid_last_cell_types <- colnames(table_data)[apply(table_data, 2, function(x) sum(x > 0) >= 13)]
+
+final_filtered_data <- filtered_data %>%
+  filter(Last_cell_type %in% valid_last_cell_types)
+
+Celltype=unique(final_filtered_data$Last_cell_type)
+write.csv(Celltype,"../data/processed_data/SingleRNA/Celltype.csv")
+Celltype=read.csv("../data/processed_data/SingleRNA/Celltype.csv")$x
+Celltype
+```
+```{r}
+Celltype=unique(filtered_data$Last_cell_type)
+Celltype
+```
+```{r}
+table(final_filtered_data$Last_cell_type)
+```
+
+```{r}
+table(final_filtered_data$AdjustedID,final_filtered_data$Last_cell_type)
+```
+
+```{r}
+# ScAll<-read.csv("../data/processed_data/SingleRNA/Sc_pdata",row.names = 1)
+# ScAll<-t(ScAll) %>% as.data.frame()
+# sc10=ScAll[rowSums(ScAll)>30,]
+# CellOlink<-CellOlink[!rownames(CellOlink)%in% c("GW"),]
+```
+```{r}
+library(data.table)
+ScBlood<-fread("../data/processed_data/SingleRNA/Scblood_pdata.csv",header = TRUE)
+ScBlood <- as.data.frame(ScBlood)
+rownames(ScBlood) <- ScBlood[, 1]  
+ScBlood <- ScBlood[, -1]   
+ScBlood<-t(ScBlood) %>% as.data.frame()
+```
+
+```{r}
+head(ScBlood)
+max(ScBlood$`B18.0_P4_CD14+PPBP+ Monocytes`)
+max(ScBlood$`B31.3_P15_CXCR6+ NK`)
+```
+
+```{r}
+# ScBlood=ScBlood[rowSums(ScBlood)>100,]
+```
+
+```{r}
+library(data.table)
+ScBloodvar<-fread("../data/processed_data/SingleRNA/Scblood_highvar.csv",header = TRUE)
+ScBloodvar <- as.data.frame(ScBloodvar)  
+rownames(ScBloodvar) <- ScBloodvar[, 1]  
+ScBloodvar <- ScBloodvar[, -1]   
+ScBloodvar<-t(ScBloodvar) %>% as.data.frame()
+
+```
+
+```{r}
+ScBloodvar[grep("^CD3",rownames(ScBloodvar)),]
+```
+### 转换为list
+```{r}
+split_dataframe_by_second_underscore <- function(df) {
+
+  split_names <- strsplit(colnames(df), "_", fixed = TRUE)
+
+  prefixes <- sapply(split_names, function(x) {
+    if (length(x) > 1) {
+      paste(x[1:2], collapse = "_")
+    } else {
+      x[1]
+    }
+  })
+  suffixes <- sapply(split_names, function(x) {
+    if (length(x) > 2) {
+      paste(x[-(1:2)], collapse = "_")
+    } else {
+      ""
+    }
+  })
+
+  df_list <- list()
+
+  unique_suffixes <- unique(suffixes)
+
+  for (suffix in unique_suffixes) {
+    columns <- which(suffixes == suffix)
+    df_list[[suffix]] <- df[, columns, drop = FALSE]
+    colnames(df_list[[suffix]]) <- prefixes[columns]
+  }
+
+  return(df_list)
+}
+
+
+ScBlood_list <- split_dataframe_by_second_underscore(ScBlood)
+
+names(ScBlood_list)
+```
+
+
+
+```{r}
+ScBlood_list$`CD56highCD16low NK`
+```
+
+```{r}
+dims <- sapply(ScBlood_list, function(x) dim(x))
+print(dims)
+```
+
+```{r}
+ScBlood_list2=ScBlood_list[unique(final_filtered_data$Last_cell_type)]
+```
+
+
+```{r}
+gene_cell_expr = list()
+ for(i in unique(final_filtered_data$Last_cell_type)){
+
+    rna_sce_subset = ScBlood_list2[[i]]
+    
+    amount_cells = dim(rna_sce_subset)[2]
+    amount_cells_expressing_gene = rowSums(rna_sce_subset > 0 )
+    perc_cells_expressing_gene = (amount_cells_expressing_gene/ amount_cells) * 100
+
+    gene_cell_expr[[i]] = data.frame(perc_cells_expressing_gene = perc_cells_expressing_gene, total_amount_cells_expressing_gene = amount_cells_expressing_gene)
+
+    }
+```
+
+
+
+```{r}
+# gene_cell_expr_data = data.frame()
+#  for(i in names(gene_cell_expr)){
+#     data = gene_cell_expr[[i]]
+#     data$gene = rownames(gene_cell_expr[[i]])
+#     data$cluster = i
+#     gene_cell_expr_data = rbind( gene_cell_expr_data, data)
+#     }
+```
+
+### genes_subset
+```{r}
+
+gene_cell_expr_data<-fread("../data/processed_data/SingleRNA/Blood_gene_cell_expr_data.csv")
+gene_cell_expr_data<-gene_cell_expr_data[,-1]
+
+```
+```{r}
+cell_perc_cluster=gene_cell_expr_data[gene_cell_expr_data$cluster%in% unique(final_filtered_data$Last_cell_type),]
+
+cell_perc_cluster[((cell_perc_cluster$perc_cells_expressing_gene >50) & (cell_perc_cluster$total_amount_cells_expressing_gene > 500))  ,] %>% group_by(cluster) %>% count()  
+```
+
+```{r}
+t1=cell_perc_cluster[((cell_perc_cluster$perc_cells_expressing_gene >50) & (cell_perc_cluster$total_amount_cells_expressing_gene > 500))  ,] %>% group_by(cluster) %>% count()  # in
+sum(t1$n)
+```
+
+```{r}
+median(cell_perc_cluster$perc_cells)
+median(cell_perc_cluster$total_amount_cells_expressing_gene)
+```
+```{r}
+genes_subset=cell_perc_cluster[((cell_perc_cluster$perc_cells_expressing_gene >50) & (cell_perc_cluster$total_amount_cells_expressing_gene > 500))  ,]
+length(unique(genes_subset$gene))
+genes_subset = na.omit(genes_subset)
+
+```
+
+
+```{r}
+
+
+quantile_normalization = function(X){
+  ranks = apply(X, 2, rank, ties.method = 'min')  
+  
+  sorted = data.frame(apply(X, 2, sort)) 
+  means = apply(sorted, 1, mean) 
+  
+  normalized_data = apply(ranks, 2 ,function(x){ means[x]}) 
+}
+
+```
+```{r}
+library(dplyr)
+library(stringr)
+```
+
+
+```{r}
+names(ScBlood_list2)
+```
+```{r}
+BloodMeta=read.csv("../data/processed_data/Meta/BloodMeta.csv")
+final_data = data.frame(row.names = BloodMeta$AdjustedID3, samples = BloodMeta$AdjustedID3)
+final_data_vis = data.frame(row.names = BloodMeta$AdjustedID3,samples = BloodMeta$AdjustedID3)
+
+```
+```{r}
+
+
+replace_names <- function(name_list) {
+  name_list <- gsub("CXCR5-", "CXCR5low", name_list)
+  name_list <- gsub("CXCR5\\+", "CXCR5high", name_list)
+  name_list <- gsub(" ", "_", name_list)
+  return(name_list)
+}
+
+names(ScBlood_list2) <- replace_names(names(ScBlood_list2))
+
+print(names(ScBlood_list2))
+genes_subset[grep("^CD3",genes_subset$gene),]
+genes_subset$cluster=replace_names(genes_subset$cluster)
+```
+```{r}
+genes_subset
+```
+
+
+```{r}
+quantile_normalization_single_cell=TRUE
+for(i in names(ScBlood_list2)){
+    data = ScBlood_list2[[i]]
+
+
+    
+    scaling_factor = colSums(data) /mean(colSums(data))
+
+    for (j in 1:ncol(data)){
+        if(scaling_factor[j] != 0){
+            data[,j] = data[,j]/ scaling_factor[j]
+            }
+        }
+
+    data = data[rownames(data) %in% genes_subset$gene[genes_subset$cluster == i],]
+
+
+    data = log2(data+1) 
+ 
+    if(quantile_normalization_single_cell == TRUE){
+        data_rows = rownames(data)
+        data  = quantile_normalization(data ) 
+        rownames(data) = data_rows
+        }
+
+    rownames(data) = paste0(i, '__' ,rownames(data))
+
+    data = data.frame(t(data))
+
+    expr_mean = data.frame( mean_expr = rowMeans(data))
+    colnames(expr_mean) = i
+    rownames(expr_mean) = rownames(data)
+    # 
+    final_data = merge(final_data, data, by = 0 ,all.x = TRUE, sort = FALSE )
+    final_data_vis = merge(final_data_vis, expr_mean, by = 0,all.x = TRUE, sort = FALSE )
+
+    rownames(final_data) =  final_data$Row.names
+    rownames(final_data_vis) = final_data_vis$Row.names
+    final_data$Row.names = NULL
+    final_data_vis$Row.names = NULL
+    }
+
+   
+```
+
+```{r}
+final_data
+dim(final_data)
+final_data[is.na(final_data)] <- 0
+
+final_data<-final_data[,-1]
+```
+```{r}
+gene_variance = apply(final_data, 2, function(x) {var( x,na.rm = TRUE)})
+```
+```{r}
+var_threshold = quantile(gene_variance, probs = seq(0, 1, 0.01), na.rm = FALSE,
+         names = TRUE)['25%']
+```
+```{r}
+gene_variance_per_type = data.frame(var = names(gene_variance), type = str_replace(names(gene_variance), '__.*', ''), variance = gene_variance)
+```
+
+```{r}
+keep_genes = names(gene_variance[gene_variance > var_threshold])
+```
+```{r}
+remove_genes = names(gene_variance[gene_variance <= var_threshold])
+```
+```{r}
+final_data$sample_id = rownames(final_data)
+final_data_long = melt(final_data)
+final_data_long=final_data_long[,!colnames(final_data_long)%in%c("samples")]
+```
+```{r}
+# final_data_long$sample_id=final_data_long$samples
+# final_data_long$samples = NULL
+final_data_long$type = 'single_cell'
+```
+
+
+
+
+
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### BloodMeta
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+# write.csv(BloodMeta,)
+BloodMeta<-read.csv("../data/processed_data/Meta/BloodMeta.csv",row.names = 1)
+```
+
+```{r}
+# PlamaOlink=read.csv("../data/processed_data/Plasma_Olink/Plasma_Olink.csv")
+# arrange(PlamaOlink,ID)
+```
+
+### PlamaOlink 
+```{r}
+PlamaOlink=read.csv("../data/processed_data/Plasma_Olink/Plasma_Olink_all.csv")
+arrange(PlamaOlink,ID)
+rownames(PlamaOlink)<-PlamaOlink$ID
+```
+```{r}
+PlamaOlink=PlamaOlink[,BloodMeta$AdjustedID2]
+all(colnames(PlamaOlink)==BloodMeta$AdjustedID2)
+colnames(PlamaOlink)<-BloodMeta$AdjustedID3
+PlamaOlink<-PlamaOlink[!rownames(PlamaOlink)%in% c("GW"),]
+write.csv(PlamaOlink,"../data/processed_data/Plasma_Olink/Blood_PlamaOlink.csv")
+```
+
+```{r}
+PlamaOlink<-t(PlamaOlink) %>% as.data.frame()
+PlamaOlink$sample_id=rownames(PlamaOlink)
+PlamaOlink_long<- melt(PlamaOlink)
+PlamaOlink_long$type<-"Plama_Olink"
+```
+
+### Cell Olink
+
+
+```{r}
+CellOlink=read.csv("../data/processed_data/Cell_Olink/Cell_stimulate_blood_olink.csv")
+# arrange(PlamaOlink,ID)
+rownames(CellOlink)<-CellOlink$Assay
+```
+
+
+```{r}
+CellOlink=CellOlink[,colnames(CellOlink) %in% BloodMeta$AdjustedID2]
+```
+
+```{r}
+BloodMeta2=BloodMeta
+rownames(BloodMeta2)<-BloodMeta2$AdjustedID2
+```
+
+
+```{r}
+# subset(BloodMeta,)
+BloodMeta2=BloodMeta2[colnames(CellOlink),]
+all(BloodMeta2$AdjustedID2==colnames(CellOlink))
+colnames(CellOlink)<-BloodMeta2$AdjustedID3
+```
+
+```{r}
+CellOlink<-CellOlink[!rownames(CellOlink)%in% c("GW"),]
+```
+```{r}
+write.csv(CellOlink,"../data/processed_data/Cell_Olink/Blood_Cell_stimulate_olink.csv")
+```
+
+```{r}
+CellOlink<-t(CellOlink) %>% as.data.frame()
+CellOlink$sample_id=rownames(CellOlink)
+CellOlink_long<- melt(CellOlink)
+CellOlink_long$type<-"Cell_stimulate_Olink"
+```
+
+### flow
+```{r}
+flowCD45=read.csv("../data/processed_data/Flow/Blood/Flow_Blood_Freq.csv")
+
+rownames(flowCD45)<-flowCD45$Cell.type
+flowCD45<-flowCD45[,-1]
+FlowCD45=flowCD45[,BloodMeta$AdjustedID3]
+```
+
+```{r}
+FlowCD45<-t(FlowCD45) %>% as.data.frame()
+FlowCD45$sample_id=rownames(FlowCD45)
+FlowCD45_long<- melt(FlowCD45)
+FlowCD45_long$type<-"Sflow_Freq_inParent"
+```
+### Bulk
+```{r}
+Bulk_log2TPM<-read.csv("../data/processed_data/Bulk/expdata_tpm_sumb10_log2TPM.csv",header = T,row.names = 1)
+
+Bulk_log2TPM<-Bulk_log2TPM[rowSums(Bulk_log2TPM)>100,]
+Bulk_log2TPM<-t(Bulk_log2TPM) %>% as.data.frame()
+```
+```{r}
+rownames(Bulk_log2TPM)<-gsub("B18_P4","B18.0_P4",rownames(Bulk_log2TPM))
+```
+
+
+```{r}
+Bulk_log2TPM$sample_id=rownames(Bulk_log2TPM)
+Bulk_log2TPM_long<- melt(Bulk_log2TPM)
+Bulk_log2TPM_long$type<-"Cell_stimulate_BulkRNA"
+```
+
+```{r}
+
+```
+
+
+```{r}
+final_data_long = final_data_long %>% group_by(sample_id, type, variable) %>% summarise(value = mean(value))  
+colnames(PlamaOlink_long)
+final_data_long<-final_data_long[,colnames(PlamaOlink_long)]
+# take average for samples measured twice
+```
+
+```{r}
+sort(unique(final_data_long$sample_id))
+```
+
+```{r}
+length(unique(final_data_long$variable))
+```
+```{r}
+data_long = rbind(final_data_long, PlamaOlink_long, CellOlink_long, FlowCD45_long ,Bulk_log2TPM_long)
+```
+
+
+
+```{r}
+length(unique(final_data_long$variable))
+```
+
+```{r}
+
+```
+
+
+```{r}
+unique(data_long$type)
+```
+```{r}
+# data_long$config = paste0(quantile_normalization_cyto, '-', quantile_normalization_proteomics, '-', quantile_normalization_neutrophils, '-', neutrophil_threshold, '-', regress_neutrophils, '-', library_adjustment_neutrophils, '-')
+```
+
+```{r}
+write.csv(data_long,"../output/tables/Combined_Data_Alldata_long.csv")
+```
+

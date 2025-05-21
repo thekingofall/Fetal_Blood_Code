@@ -1,0 +1,742 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+sorted_values
+```
+
+```{r}
+weights = get_weights(model, views = "all", factors = "all")
+```
+
+```{r}
+weight_data = data.frame()
+for (i in names(weights)){
+    data = data.frame(weights[[i]])
+    data$type = i
+    weight_data = rbind(weight_data,data)
+}
+weight_data$variable_name = rownames(weight_data)
+write.csv(weight_data,"../output/tables/Weight_table.csv")
+# write.csv(weight_data, paste0(result_path, '/E-Analysis/Weight_Data_w_o_clinical' , name, '_', train_opts$weight_views, '.csv'), row.names = FALSE)
+```
+
+```{r}
+factors = get_factors(model, factors = "all",as.data.frame = T)
+# factors_merge = data.frame(factors)
+# factors_merge$sample_id = rownames(factors_merge)
+write.csv(factors,"../output/tables/factors_table.csv")
+```
+
+```{r}
+# merged_data=
+merged_data_long = factors
+merged_data_long$pcw =substring( merged_data_long$sample,2,5) %>% as.numeric()
+# merged_data_long$class_measurement[merged_data_long$measurement %in% c('TP1', 'TP2', 'TP3', 'TP4')] =merged_data_long$measurement[merged_data_long$measurement %in% c('TP1', 'TP2', 'TP3', 'TP4')] 
+# merged_data_long = merged_data_long[!is.na(str_extract(merged_data_long$variable, 'Factor')),]
+# merged_data = merge(factors_merge, sample_data, by.x = 'sample_id', by.y = 'sample_id')
+```
+
+```{r}
+
+```
+```{r}
+total_variance_factor = data.frame(factor = names(rowMeans(model@cache$variance_explained$r2_per_factor[[1]])),
+                                   mean_variance = rowMeans(model@cache$variance_explained$r2_per_factor[[1]]))
+```
+
+```{r}
+data = model@cache$variance_explained$r2_per_factor[[1]]
+total_variance = data.frame( view = names(model@cache[["variance_explained"]]$r2_total$group1),
+                             total_variance = model@cache[["variance_explained"]]$r2_total$group1)
+data = melt(data)
+data = merge(data, total_variance, by.x = 'Var2', by.y = 'view')
+```
+```{r}
+replace_var2_values <- function(var2) {
+  original_values <- c(
+    "BCR", "CD14xPPBPx_Monocytes", "CD4TCR", "CD56highCD16low_NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical_Monocytes", "CX3CR1x_NK", "CXCR5high_Naive_B", 
+    "CXCR5low_Naive_B", "CXCR6x_NK", "DC2", "Gamma_Delta_V2_T", 
+    "HSC_MPP", "MEMP", "MEP", "MyeloidxCD177", "Naive_CD4_T", 
+    "Naive_CD8_T", "NK_T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  )
+
+  new_values <- c(
+    "BCR", "CD14+PPBP+ Monocytes", "CD4TCR", "CD56highCD16low NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical Monocytes", "CX3CR1+ NK", "CXCR5+ Naïve B", 
+    "CXCR5- Naïve B", "CXCR6+ NK", "DC2", "Gamma Delta V2 T", 
+    "HSC_MPP", "MEMP", "MEP", "Myeloid-CD177", "Naïve CD4 T", 
+    "Naïve CD8 T", "NK T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  )
+  mismatches <- original_values != new_values[1:length(original_values)]
+
+# 输出不匹配的元素及其索引
+mismatch_indices <- which(mismatches)
+mismatch_original <- original_values[mismatch_indices]
+mismatch_new <- new_values[mismatch_indices]
+
+# 显示不匹配的元素及其索引
+data.frame(Index = mismatch_indices, Original = mismatch_original, New = mismatch_new)
+  
+
+  replace_vector <- setNames(new_values, original_values)
+  
+  var2 <- recode(var2, !!!replace_vector)
+  
+  return(var2)
+}
+sorted_values <- c(
+  "HSC_MPP",         # 造血干细胞和多能祖细胞
+  "MEMP",            # 淋巴-髓系前体细胞
+  "MEP",             # 髓系红系前体细胞
+
+  "Naïve CD4 T","Treg", "Naïve CD8 T", # 初始T细胞
+   "Gamma Delta V2 T", # T细胞
+  "Th17like_INNATE_T",  # 特殊T细胞亚群
+  "NK T",  "CX3CR1+ NK", "CXCR6+ NK", "CD56highCD16low NK",# NK细胞
+  "CXCR5- Naïve B", "CXCR5+ Naïve B",   "Myeloid-CD177",   # 髓系细胞
+  "CD14+PPBP+ Monocytes", "Classical Monocytes", # 单核细胞
+  "DC2", "pDC",      # 树突状细胞
+  "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", # 刺激条件下的细胞
+  "Plama_Olink", "Sflow_Freq_inParent","CD4TCR", "CD8TCR",  "BCR"# 其他
+)
+sorted_values<-rev(sorted_values)
+```
+
+
+```{r}
+source("config.R")
+```
+
+
+```{r}
+blue_green_palette = c(
+    '#334555',  
+    '#183D59',  
+    '#00789F',  
+    '#0092AE', 
+    '#14AFBE',  
+    '#54C3C4', 
+    '#99D7CA', 
+    '#CBE7E2', 
+    '#FAFCFB')
+library(ggplot2)
+plotvar=plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+ scale_fill_gradientn(colors = rev(blue_green_palette))
+plotvar
+dir.create("../output/plots/MOFA",showWarnings = F)
+ggsave(plot = plotvar,"../output/plots/MOFA/F1_plotvar.pdf")
+```
+
+```{r}
+# setdiff(Vardata$view,sorted_values)
+```
+```{r}
+# setdiff(sorted_values,Vardata$view)
+```
+```{r}
+# Vardata
+```
+
+```{r}
+Vardata=plotvar$data
+Vardata$view<-replace_var2_values(Vardata$view)
+Vardata$view<-factor(Vardata$view,levels = sorted_values)
+```
+```{r}
+dims <- sapply(data_list, function(x) dim(x)) %>% unlist() %>% t() %>% as.data.frame()
+print(dims)
+```
+```{r}
+dataCell=data.frame( old=c(
+    "BCR", "CD14xPPBPx_Monocytes", "CD4TCR", "CD56highCD16low_NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical_Monocytes", "CX3CR1x_NK", "CXCR5high_Naive_B", 
+    "CXCR5low_Naive_B", "CXCR6x_NK", "DC2", "Gamma_Delta_V2_T", 
+    "HSC_MPP", "MEMP", "MEP", "MyeloidxCD177", "Naive_CD4_T", 
+    "Naive_CD8_T", "NK_T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  ),
+
+  new_values =c(
+    "BCR", "CD14+PPBP+ Monocytes", "CD4TCR", "CD56highCD16low NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical Monocytes", "CX3CR1+ NK", "CXCR5+ Naïve B", 
+    "CXCR5- Naïve B", "CXCR6+ NK", "DC2", "Gamma Delta V2 T", 
+    "HSC_MPP", "MEMP", "MEP", "Myeloid-CD177", "Naïve CD4 T", 
+    "Naïve CD8 T", "NK T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  ))
+Count=merge(dataCell,dims,by.x="old",by.y="row.names")
+```
+
+```{r}
+Count$new_values<-factor(Count$new_values,levels=sorted_values)
+```
+
+```{r}
+Pvar4=ggplot(Count, aes(x = new_values, y = V1, fill =new_values)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Feature count", x = "View", y = "feature count number") +
+ theme_classic()+
+  coord_flip() +
+  theme(legend.position = "none")
+      # 移除y轴线 
+
+# plotvar3 
+```
+
+```{r}
+
+library(dplyr)
+
+grouped_sum <- Vardata %>%
+  group_by(view) %>%
+  summarize(total_value = sum(value, na.rm = TRUE))
+
+# 将总和大于100的值设置为100
+grouped_sum <- grouped_sum %>%
+  mutate(total_value = ifelse(total_value > 100, 100, total_value))
+
+# 打印结果
+print(grouped_sum)
+ggplot(grouped_sum, aes(x = view, y = total_value, fill = view)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Value by View", x = "View", y = "Total Value") +
+  theme_minimal() +
+  coord_flip() +
+  theme(legend.position = "none")
+plotvar3 <- ggplot(grouped_sum, aes(x = view, y = total_value, fill = view)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Value ", x = "View", y = "Total Value") +
+  theme_classic() +
+  coord_flip() +
+  theme(legend.position = "none")
+plotvar3 
+
+```
+```{r}
+unique(Vardata$view)
+```
+
+
+```{r}
+plotvar2=ggplot(Vardata, aes_string(x = "view", y = "factor")) + geom_tile(aes_string(fill = "value"), 
+        color = "black")  + labs(x = "", y = "", title = "") + 
+        scale_fill_gradientn(colors = c("gray97", "darkblue"), 
+            guide = "colorbar") + 
+        guides(fill = guide_colorbar("Var. (%)")) + theme(axis.text.x = element_text(size = rel(1), 
+        color = "black"), axis.text.y = element_text(size = rel(1.1), 
+        color = "black"), axis.line = element_blank(), axis.ticks = element_blank(), 
+        panel.background = element_blank(), strip.background = element_blank(), 
+        strip.text = element_text(size = rel(1)))+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+ scale_fill_gradientn(colors = rev(blue_green_palette))+ coord_flip() +labs(title = "Percentage variance by View in Factors", x = "View", y = "Factor") 
+plotvar2
+ggsave(plot = plotvar2,"../output/plots/MOFA/F1_plotvar.pdf")
+```
+```{r}
+mop_cells_palette = c(
+    '#E41A1C', 
+    '#FF7F00', 
+    '#FFD92F',  
+    '#E6AB02',  
+    '#FFFF99',  
+    '#BC80BD',  
+    '#1B9E77', 
+    '#66C2A5',  
+    '#8DA0CB',  
+    '#A6CEE3',  
+    '#B3E2CD',  
+    '#FFFFB3',  
+    '#FB8072',  
+    '#80B1D3',  
+    '#FDB462', 
+    '#B3DE69',  
+    '#FCCDE5', 
+    '#D9D9D9',  
+    '#BC80BD',  
+    '#CCEBC5', 
+    '#377EB8',"#11A579","#F2B701","#66C5CC","#80BA5A","#F6CF71"
+)
+plotvar3 <- ggplot(grouped_sum, aes(x = view, y = total_value, fill = view)) +
+  geom_bar(stat = "identity") +scale_fill_manual(values = mop_cells_palette)+
+  labs(title = "Total percentage", x = "View", y = "variance(%)") +  #
+  theme_classic() +
+  coord_flip() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),          
+        axis.text.y = element_blank(),          
+        axis.ticks.y = element_blank(),          
+)           
+plotvar3 
+```
+```{r}
+Xp=plot_variance_explained(model, x="view", y="factor")+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+Xp$data
+Xp$data$group<-NULL
+Factor_long <- Xp$data
+
+# 将数据转换为宽格式
+Factor_wide <- Factor_long %>%
+  pivot_wider(names_from = view, values_from = value) %>% as.data.frame()
+
+rownames(Factor_wide )<-Factor_wide$factor
+row_sums <- rowSums(Factor_wide[,-1])
+col_sums <- colSums(Factor_wide[,-1])
+Fctor3_long=filter(Factor_long, factor == "Factor3")
+# ggplot() +
+#   geom_bar(aes(x = view, y = value,fill=value), stat = "identity") +
+#   labs(title = "Factor3 Values by View",
+#        x = "View",
+#        y = "Var%") +
+#   theme_classic()+ theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+# 
+# Count
+
+Fctor3_long2=merge(Fctor3_long,Count,by.x="view",by.y="old")
+Fctor3_long2$new_values<-factor(Fctor3_long2$new_values,levels = sorted_values)
+
+Fctor3_long3=Fctor3_long2
+plotvar6 <- ggplot(Fctor3_long2, aes(x = new_values, y = value, fill =new_values )) +
+  geom_bar(stat = "identity") +scale_fill_manual(values = mop_cells_palette)+
+  labs(title = "Factor3 percentage", x = "View", y = "variance(%)") + 
+  theme_classic() +
+  coord_flip() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),          
+        axis.text.y = element_blank(),           
+        axis.ticks.y = element_blank(),          
+)         
+plotvar6
+```
+
+```{r}
+Pvar5=Pvar4+
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),       
+        axis.text.y = element_blank(),          
+        axis.ticks.y = element_blank(),         
+)     +scale_fill_manual(values = mop_cells_palette)      
+```
+
+```{r}
+single_cell_views <- c( "CD14+PPBP+ Monocytes", "CD56highCD16low NK", 
+                       "CX3CR1+ NK", "CXCR5+ Naïve B", "CXCR5- Naïve B", "CXCR6+ NK", 
+                       "DC2", "Gamma Delta V2 T", "HSC_MPP", "MEMP", "MEP", "Classical Monocytes",
+                       "Myeloid-CD177", "Naïve CD4 T", "Naïve CD8 T", "NK T", 
+                       "pDC", "Th17like_INNATE_T", "Treg")
+tcr_views <- c("CD4TCR", "CD8TCR")
+bcr_views <- c("BCR")
+olink_views <- c("Plama_Olink", "Cell_stimulate_Olink")
+bulk_rna_views <- c("Cell_stimulate_BulkRNA")
+
+Sflow_rna_views <- c("Sflow_Freq_inParent")
+Vardata <- Vardata %>%
+  mutate(type = case_when(
+    view %in% single_cell_views ~ "Single Cell",
+    view %in% tcr_views ~ "TCR",
+    view %in% bcr_views ~ "BCR",
+    view %in% olink_views ~ "Olink",
+    view %in% bulk_rna_views ~ "Cell_stimulate_BulkRNA",
+    view %in% Sflow_rna_views ~ "Sflow_Freq_inParent",
+    TRUE ~ "Other"
+  ))
+
+colors <- c(
+  red = "#E41A1C",
+  orange = "#FF7F00",
+  purple = "#984EA3",
+  light_purple = "#7570B3",
+  green = "#4DAF4A",
+  cyan = "#00BFC4"
+)
+
+
+print(colors)
+
+type_colors <- c("Single Cell" = "#E41A1C", "TCR" = "#11A579", "BCR" ="#F6CF71", "Olink" ="#7570B3", "Cell_stimulate_BulkRNA" =  "#4DAF4A", "Sflow_Freq_inParent" = "#FF7F00")
+
+
+annotation_plot <- ggplot(Vardata, aes(x = 1, y = view, fill = type)) +
+  geom_tile() +
+  scale_fill_manual(values = type_colors) +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+
+```{r}
+library(aplot)
+aligned_plot <- plotvar2 %>%  insert_right(annotation_plot, width = 0.05) %>% 
+  insert_right(plotvar3, width = 0.5)%>% 
+  insert_right(Pvar5, width = 0.5)%>% 
+  insert_right(plotvar6, width = 0.5)
+  
+aligned_plot 
+ggsave(plot = aligned_plot,"../output/plots/MOFA/F2_plotvar.pdf",width = 12,height = 5)
+```
+
+
+
+```{r}
+library(aplot)
+aligned_plot2 <- plotvar2 %>%  insert_left(annotation_plot, width = 0.05) %>% 
+  insert_right(plotvar3, width = 0.5)%>% 
+  insert_right(Pvar5, width = 0.5)
+  # insert_right(plotvar6, width = 0.5)
+  
+aligned_plot2 
+ggsave(plot = aligned_plot2,filename ="../output/plots/MOFA/F2_plotvar2.pdf",width = 10,height = 5)
+
+
+```
+
+
+```{r}
+Celltype=read.csv("../data/processed_data/SingleRNA/Celltype.csv")$x
+```
+
+```{r}
+
+# library(dplyr)
+
+
+# original_values <- c(
+#   "BCR", "CD14xPPBPx_Monocytes", "CD4TCR", "CD56highCD16low_NK", 
+#   "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+#   "Classical_Monocytes", "CX3CR1x_NK", "CXCR5high_Naive_B", 
+#   "CXCR5low_Naive_B", "CXCR6x_NK", "DC2", "Gamma_Delta_V2_T", 
+#   "HSC_MPP", "MEMP", "MEP", "MyeloidxCD177", "Naive_CD4_T", 
+#   "Naive_CD8_T", "NK_T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+#   "Th17like_INNATE_T", "Treg"
+# )
+# 
+# new_values <- c(
+#   "CXCR5- Naïve B", "CD14+PPBP+ Monocytes", "CD4TCR", "CD56highCD16low NK", 
+#   "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+#   "Classical Monocytes", "CX3CR1+ NK", "CXCR5+ Naïve B", 
+#   "CXCR5low Naïve B", "CXCR6+ NK", "DC2", "Gamma Delta V2 T", 
+#   "HSC_MPP", "MEMP", "MEP", "Myeloid-CD177", "Naïve CD4 T", 
+#   "Naïve CD8 T", "NK T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+#   "Th17like_INNATE_T", "Treg"
+# )
+# 
+# 
+# replace_vector <- setNames(new_values, original_values)
+# 
+# 
+# data <- data %>% 
+#   mutate(Var2 = recode(Var2, !!!replace_vector))
+# 
+# print(data)
+```
+
+```{r}
+weight_data$gene = weight_data$variable_name
+```
+```{r}
+weight_data$gene = str_replace(weight_data$variable_name, '.*__', '')
+```
+
+```{r}
+weight_data$view = weight_data$type
+```
+```{r}
+unique(data$Var2)
+```
+
+```{r}
+# weight_data$view[!weight_data$type %in% c('pDC ')] = str_replace(weight_data$variable_name[!weight_data$type %in% c('cytokine','neutrophil','proteomics', 'clinical_data')], '__.*', '')
+```
+
+```{r}
+unique(weight_data$view)
+# weight_data$view<- replace_var2_values(weight_data$view)
+unique(weight_data$view)
+```
+
+```{r}
+melt=reshape2::melt
+feature_weights_long = reshape2::melt(weight_data)
+```
+
+```{r}
+factor_data = melt(factors)
+factor_data<-factor_data[,-c(3:4)]
+colnames(factor_data) = c('sample_id', 'variable', 'value')
+```
+
+```{r}
+top_variable_fraction_list  = c(0.0005 ,0.001, 0.0025, 0.005, 0.025, 0.05, 0.1,0.5)
+```
+
+```{r}
+geneset_oi_amounts = data.frame()
+geneset_oi_per_fraction = data.frame()
+```
+
+```{r}
+head(feature_weights_long,2)
+```
+```{r}
+dimensions = unique(feature_weights_long[,c('view', 'variable')])
+head(dimensions)
+```
+
+```{r}
+for(i in top_variable_fraction_list){
+
+    geneset_oi_pos_per_factor_analyze = feature_weights_long %>% group_by(variable) %>% arrange( desc(value),  .by_group = TRUE)  %>% top_frac(i)
+    geneset_oi_pos_per_factor_analyze$direction = 'positive'
+    
+    geneset_oi_neg_per_factor_analyze = feature_weights_long %>% group_by(variable) %>% arrange(desc(value),  .by_group = TRUE)  %>% top_frac(-i)
+    geneset_oi_neg_per_factor_analyze$direction = 'negative'
+    
+    geneset_oi_analyze = rbind(geneset_oi_pos_per_factor_analyze, geneset_oi_neg_per_factor_analyze)
+    geneset_oi_analyze$fraction = i
+    
+    geneset_oi_per_fraction = rbind(geneset_oi_per_fraction,geneset_oi_analyze)
+    
+    amount_geneset_oi_type = geneset_oi_analyze %>% group_by(type, view, variable) %>% count()
+    amount_geneset_oi_type = merge(dimensions, amount_geneset_oi_type, all.x = TRUE)
+    amount_geneset_oi_type$fraction = i
+    
+    geneset_oi_amounts = rbind(geneset_oi_amounts, amount_geneset_oi_type)
+    }
+```
+
+```{r}
+features_per_type = feature_weights_long %>% group_by(type, view, variable) %>% count()
+colnames(features_per_type) = c('type', 'view', 'variable', 'amount_features')
+```
+
+```{r}
+geneset_oi_amounts = merge(  geneset_oi_amounts,features_per_type, all.x = TRUE)
+geneset_oi_amounts$percentage = geneset_oi_amounts$n / geneset_oi_amounts$amount_features
+```
+```{r}
+head(geneset_oi_per_fraction,2)
+```
+
+```{r}
+geneset_oi_amounts[is.na(geneset_oi_amounts)] = 0
+```
+
+```{r}
+unique(geneset_oi_per_fraction$fraction)
+```
+
+```{r}
+# analysis_data_subset = geneset_oi_per_fraction[geneset_oi_per_fraction$fraction == top_frac,]   #with filtering for certain fraction
+analysis_data_subset = geneset_oi_per_fraction[geneset_oi_per_fraction$variable %in% c('Factor3'),]
+```
+```{r}
+analysis_data_subset$direction_sign = analysis_data_subset$direction
+analysis_data_subset$direction_sign[analysis_data_subset$direction == 'positive'] = '+'
+analysis_data_subset$direction_sign[analysis_data_subset$direction == 'negative'] = '-'
+```
+
+```{r}
+analysis_data_subset$cell_type = str_replace(analysis_data_subset$view, '\\(Cluster.*\\)', '')
+analysis_data_subset$cluster = str_extract(analysis_data_subset$view, '\\(Cluster.*\\)')
+analysis_data_subset$cluster = str_replace_all(analysis_data_subset$cluster, '\\(|\\)', '')
+analysis_data_subset$facet =  paste0(analysis_data_subset$direction_sign, analysis_data_subset$view)
+```
+
+```{r}
+analysis_data_subset$cluster[is.na(analysis_data_subset$cluster)] = analysis_data_subset$cell_type[is.na(analysis_data_subset$cluster)]
+```
+
+```{r}
+
+```
+```{r}
+
+  data_long=read.csv("~/Main_Gao_ScanpyProject20231130/MOFA/MOFAR//output/tables/Combined_Data_Alldata_long_norm.csv",row.names = 1)
+colnames(data_long) = c('sample_id', 'variable_name', 'expression_value', 'type')
+```
+
+```{r}
+heatmap_data = merge(data_long, analysis_data_subset, by.x = c('variable_name'), by.y = c('variable_name'))
+```
+```{r}
+head(heatmap_data,2)
+```
+
+```{r}
+heatmap_data = heatmap_data[heatmap_data$sample_id %in% samples,]
+```
+
+```{r}
+# Specific Text Descriptions:
+xlabel = xlab('') 
+ylabel = ylab('Factor Value')
+# Sizes of the plot
+width_par = 8.07
+height_par = 3.5
+```
+
+```{r}
+merged_data_long$condition<-ifelse(merged_data_long$pcw<26,"Early","Late")
+```
+
+```{r}
+
+
+vis_data = merged_data_long
+g = ggplot(vis_data, aes(x=factor, y=value, fill = condition))  + 
+    plot_config +
+    xlabel + 
+    ylabel +
+ 
+    ggtitle('Pattern of factor values') + 
+    theme(legend.position = "bottom", axis.text.x = element_text(angle = 90))+
+    geom_boxplot(outlier.size = 0.05)  + geom_point(position=position_jitterdodge(jitter.width = 0.05), size = 0.005)
+
+print(g)
+
+# pdf(paste0('figures/Supplementary_Figures/', figure_name, name, train_opts$weight_views, '.pdf'), width =width_par, height =height_par)
+# print(g)
+# dev.off()
+
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+
+
+vis_data = merged_data_long
+
+
+g = ggplot(vis_data, aes(x=factor, y=value, fill=condition)) +
+    plot_config +
+    xlabel +
+    ylabel +
+   
+    ggtitle('Pattern of factor values') +
+    theme(legend.position = "bottom", axis.text.x = element_text(angle = 90)) +
+    geom_boxplot(outlier.size = 0.05) +
+    geom_point(position=position_jitterdodge(jitter.width = 0.05), size = 0.005)
+
+g = g + stat_compare_means(
+        aes(group = condition), 
+        method = "t.test", 
+        label = "p.signif", 
+        size = 3, 
+        label.y = 1.5 
+    )
+
+print(g)
+```
+```{r}
+library(ggplot2)
+library(ggpubr)
+
+vis_data = merged_data_long
+col1=c("#C71000FF","#8A4198FF",  "#023f75", "#008EA0FF", 
+ "#266b69","#f6c619", "#FF6348FF","#c29f62")
+
+g = ggplot(vis_data, aes(x=factor, y=value, fill=condition)) +
+    plot_config +
+    xlabel +
+    ylabel +
+ 
+    ggtitle('Pattern of factor values') +
+    theme(legend.position = "bottom", axis.text.x = element_text(angle = 90)) +
+    geom_boxplot(outlier.size = 0.05) +
+    geom_point(position=position_jitterdodge(jitter.width = 0.05), size = 1)+
+scale_fill_manual(values = col1)+
+   scale_color_manual(values = col1)
+
+g = g + stat_compare_means(
+        aes(group = condition), 
+        method = "wilcox.test", 
+        label = "p.signif", 
+        size = 3, 
+        label.y = 1.5 
+    )
+
+
+print(g)
+pdf(paste0('../output/plots/Factor_condition','.pdf'), width =width_par, height =height_par)
+print(g)
+dev.off()
+```
+
+```{r}
+heatmap_data$measurement2<-ifelse(as.numeric(substring(heatmap_data$sample_id,2,5))<26,"Early","Late")
+variable = 'measurement2'
+heatmap_data$facet2 = heatmap_data[,variable]
+heatmap_data$facet = paste0(heatmap_data$direction_sign, heatmap_data$view)
+
+analysis_data_subset$facet = paste0(analysis_data_subset$direction_sign,analysis_data_subset$view)
+analysis_data_subset$facet2 = 'Absolute Factor Value'
+```
+```{r}
+top_frac = '0.005'
+factor_var = 'Factor3'
+```
+
+```{r}
+
+xlabel_heatmap = xlab('Samples') 
+ylabel_heatmap = ylab('View')
+
+xlabel_barplot = xlab('Samples') 
+ylabel_barplot = ylab('Absolute Factor Value')
+
+width_par = 8.07
+height_par = 11.4
+```
+
+```{r}
+ analysis_data_subset[(analysis_data_subset$fraction == top_frac) &
+                                                          (analysis_data_subset$variable == factor_var),]
+```
+```{r}
+
+```
+
+
+```{r}
+factor_value_all_bar = ggplot(data = analysis_data_subset[(analysis_data_subset$fraction == top_frac) &
+                                                          (analysis_data_subset$variable == factor_var),] , mapping = aes(x = gene,   y= abs(value)))+
+                            plot_config_heatmap_supp  + 
+                            geom_bar(stat="identity", width = 0.1) + 
+                            coord_flip()+
+                            xlabel_barplot +
+                            ylabel_barplot +
+                            theme( axis.text.y = element_text( hjust = 1, vjust =1))+
+                            facet_grid(facet  ~ facet2, scales = 'free', space = 'free', switch = 'y') + theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.5, "cm"))+
+                            ggtitle('')
+factor_value_all_bar 
+```
+
+```{r}
+all_heatmap = ggplot(data = heatmap_data[(heatmap_data$variable == factor_var) & 
+                                         (heatmap_data$fraction == top_frac) 
+                                         ,], # TBD whether to filter on sample subset
+                     mapping = aes(sample_id, gene,  fill= expression_value)) +
+    scale_fill_gradient2(low="navy", high="red", midpoint = 0) + 
+    geom_tile() + 
+    xlabel_heatmap +
+    ylabel_heatmap +
+    plot_config_heatmap_supp  + theme(axis.text.x = element_blank()) + 
+    facet_grid(facet  ~facet2, scales = 'free', space = 'free',  switch = "y") + theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0))+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Normalized Expression Values of top ',as.numeric(top_frac) *100 *2, '% features'))
+all_heatmap
+ggsave(plot = all_heatmap,"../output/plots/MOFA/all_heatmap.pdf",width = 6,height = 14)
+```
+

@@ -1,0 +1,131 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+data_long=read.csv("../output/tables/Combined_Data_Alldata_long.csv",row.names = 1)
+
+```
+```{r}
+
+Bmerge<-read.csv("../data/processed_data/TCRBCR/Bmerge.csv",row.names = 1)
+Bmerge<-Bmerge[grep("B",Bmerge$sample_id),]
+Bmerge<-Bmerge[Bmerge$sample_id %in%unique(data_long$sample_id),]
+length(unique(Bmerge$variable))
+
+Bmerge<-Bmerge[grep("IGH",Bmerge$variable),]
+unique(Bmerge$sample_id)
+Tmerge<-read.csv("../data/processed_data/TCRBCR/Tmerge.csv",row.names = 1)
+
+```
+```{r}
+data_long=rbind(data_long,Bmerge,Tmerge)
+```
+
+
+```{r}
+data_long$expression = TRUE
+```
+```{r}
+data_long$expression[data_long$value == 0] = FALSE
+```
+
+```{r}
+expression_filter = data_long %>% group_by(type, variable) %>% summarise(perc_expression = sum(expression)  )
+```
+
+```{r}
+expression_filter$perc_expression = expression_filter$perc_expression / length(unique(data_long$sample_id))
+```
+
+```{r}
+unique(expression_filter$type[expression_filter$perc_expression <= 0.2])
+```
+```{r}
+data_long2=data_long
+data_long= merge(data_long, expression_filter[,c('type', 'variable')], by.x = c('type', 'variable'), by.y = c('type', 'variable'))   # filter the data
+```
+
+```{r}
+data_long$ident = paste0(data_long$type, '_0_', data_long$variable)
+```
+
+```{r}
+length(unique(data_long2$variable))
+```
+
+```{r}
+final_data= dcast(data_long, sample_id ~ ident , value.var = "value") 
+```
+
+```{r}
+rownames(final_data) = final_data$sample_id
+final_data$sample_id = NULL
+```
+```{r}
+ncol(final_data)
+```
+
+
+
+```{r}
+data_nas = is.na(final_data)
+```
+```{r}
+keep_samples = names(rowSums(data_nas))[rowSums(data_nas) != ncol(final_data)]
+```
+```{r}
+final_data = final_data[keep_samples,]
+```
+```{r}
+nrow(final_data)
+```
+
+```{r}
+quantile_norm_feat=TRUE
+```
+
+```{r}
+
+stdnorm <- function(x) {
+  set.seed(42)
+  r = rank(x[!is.na(x)], ties.method="average")
+  x[!is.na(x)] = qnorm(r / (length(x[!is.na(x)]) + 1))
+  return(x)
+}
+```
+
+```{r}
+if(quantile_norm_feat == TRUE){
+    final_data = apply(final_data, 2,stdnorm)
+    final_data = data.frame(final_data)
+    final_data[data_nas] = NA
+    final_data$sample_id = rownames(final_data)
+    data_long = melt(final_data)
+    data_long$type = str_extract(data_long$variable, '.*_0_')
+    data_long$type  = str_replace(data_long$type , '_0_', '')
+    data_long$variable = str_replace(data_long$variable, '.*_0_', '')
+    }
+```
+
+```{r}
+length(unique(data_long$variable))
+```
+
+```{r}
+write.csv(data_long, "../output/tables/Combined_Data_Alldata_long_norm.csv")
+```
+
+```{r}
+table(data_long$type)
+```

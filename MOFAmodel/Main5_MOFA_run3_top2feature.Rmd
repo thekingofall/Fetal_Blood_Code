@@ -1,0 +1,1193 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-08-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+names(data_list)
+```
+```{r}
+
+```
+
+### 绘制权重图
+
+```{r}
+library(ggplot2)
+library(patchwork)
+dir.create("../output/plots/MOFA/Allweights", showWarnings = FALSE)
+
+
+plot_list <- list()
+
+for (i in names(data_list)) {
+  o1 <- plot_weights(mofa, 
+                     view = i, 
+                     factors = 3, 
+                     nfeatures = 10, 
+                     text_size = 4)
+
+  ggsave(plot = o1, filename = paste0("../output/plots/MOFA/Allweights/", i, ".pdf"), width = 6, height = 3)
+
+  plot_list[[i]] <- o1
+}
+
+combined_plot <- wrap_plots(plot_list)
+
+ggsave(plot = combined_plot, filename = "../output/plots/MOFA/Allweights/combined_plot.pdf", width = 20, height = 18)
+```
+
+```{r}
+
+```
+
+```{r}
+library(ggplot2)
+library(patchwork)
+dir.create("../output/plots/MOFA/Allweights2", showWarnings = FALSE)
+
+plot_list <- list()
+for (i in names(data_list)) {
+  o1 <- plot_weights(mofa, 
+                     view = i, 
+                     factors = 3, 
+                     nfeatures = 3, 
+                     text_size = 4)
+
+  ggsave(plot = o1, filename = paste0("../output/plots/MOFA/Allweights2/", i, ".pdf"), width = 6, height = 3)
+
+  plot_list[[i]] <- o1
+}
+
+
+combined_plot <- wrap_plots(plot_list)
+
+ggsave(plot = combined_plot, filename = "../output/plots/MOFA/Allweights2/combined_plot.pdf", width = 20, height = 18)
+```
+
+```{r}
+library(ggplot2)
+library(patchwork)
+
+output_dir <- "../output/plots/MOFA/positive_weight"
+
+dir.create(output_dir, showWarnings = FALSE)
+
+
+plot_list <- list()
+
+for (i in names(data_list)) {
+  o1 <- plot_top_weights(mofa, 
+  view =i, 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 6,
+)
+
+  ggsave(plot = o1, filename = paste0(output_dir, "/", i, ".pdf"), width = 6, height = 3)
+
+  plot_list[[i]] <- o1
+}
+
+combined_plot <- wrap_plots(plot_list)
+
+ggsave(plot = combined_plot, filename = paste0(output_dir, "/combined_plot.pdf"), width = 20, height = 18)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(ggplot2)
+library(patchwork)
+
+output_dir <- "../output/plots/MOFA/negative_weight"
+
+dir.create(output_dir, showWarnings = FALSE)
+
+plot_list <- list()
+
+for (i in names(data_list)) {
+  o1 <- plot_top_weights(mofa, 
+  view =i, 
+  factors = 3, 
+  sign = "negative",
+  nfeatures = 6,
+)
+
+  ggsave(plot = o1, filename = paste0(output_dir, "/", i, ".pdf"), width = 6, height = 3)
+
+  plot_list[[i]] <- o1
+}
+
+combined_plot <- wrap_plots(plot_list)
+
+ggsave(plot = combined_plot, filename = paste0(output_dir, "/combined_plot.pdf"), width = 20, height = 18)
+```
+
+```{r}
+data1wBCRN= plot_top_weights(mofa, 
+  view ="BCR", 
+  factors = 3, 
+  sign = "negative",
+  nfeatures = 6)
+# data1wBCRN
+data1wBCRN2=data1wBCRN$data
+data1wBCRN2$value<- -data1wBCRN2$value
+data1wBCRP= plot_top_weights(mofa, 
+  view ="BCR", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 6)
+data1wBCRP2=data1wBCRP$data
+
+data1wBCRN2P=rbind(data1wBCRN2,data1wBCRP2)
+
+library(ggplot2)
+
+data1wBCR_N2P=ggplot(data1wBCRN2P, aes(x = reorder(feature, value), y = value)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  geom_text(aes(x = reorder(feature, value), y = ifelse(value > 0, -0.01, 0.01), label = feature), 
+            angle = 90, hjust = ifelse(data1wBCRN2P$value > 0, 1, 0), vjust = 0.5) +
+  scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, by = 0.5)) +
+  labs(x = "", y = "", title = "BCR") +
+  theme_classic() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.line.x = element_blank()
+  )
+data1wBCR_N2P
+```
+
+```{r}
+library(ggplot2)
+
+plot_custom_weights <- function(mofa, view, factors, nfeatures, title = "BCR", fill_color = "grey") {
+
+  negative_weights <- plot_top_weights(mofa, view = view, factors = factors, sign = "negative", nfeatures = nfeatures)
+  negative_weights_data <- negative_weights$data
+  negative_weights_data$value <- -negative_weights_data$value
+
+  positive_weights <- plot_top_weights(mofa, view = view, factors = factors, sign = "positive", nfeatures = nfeatures)
+  positive_weights_data <- positive_weights$data
+
+  combined_weights_data <- rbind(negative_weights_data, positive_weights_data)
+  
+  # 绘制图表
+  ggplot(combined_weights_data, aes(x = reorder(feature, value), y = value)) +
+    geom_bar(stat = "identity", fill = fill_color) +
+    geom_text(aes(x = reorder(feature, value), y = ifelse(value > 0, -0.01, 0.01), label = feature), 
+              angle = 90, hjust = ifelse(combined_weights_data$value > 0, 1, 0), vjust = 0.5) +
+    scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, by = 0.5)) +
+    labs(x = "", y = "", title = title) +
+    theme_classic() +
+    theme(
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_blank(),
+      axis.line.x = element_blank(),
+      plot.title = element_text(hjust = 0.5)  
+    )
+}
+
+
+plot_custom_weights(mofa, view = "BCR", factors = 3, nfeatures = 6, title = "Custom BCR Title", fill_color = "blue")
+```
+
+```{r}
+
+```
+
+```{r}
+library(ggplot2)
+library(patchwork)
+mop_cells_palette = c(
+    '#E41A1C',  
+    '#FF7F00',  
+    '#FFD92F', 
+    '#E6AB02',  
+    '#FFFF99',  
+    '#BC80BD', 
+    '#1B9E77', 
+    '#66C2A5',  
+    '#8DA0CB',  
+    '#A6CEE3',  
+    '#B3E2CD', 
+    '#FFFFB3', 
+    '#FB8072',  
+    '#80B1D3',  
+    '#FDB462',  
+    '#B3DE69',  
+    '#FCCDE5',  
+    '#D9D9D9', 
+    '#BC80BD',
+    '#CCEBC5',  
+    '#377EB8',"#11A579","#F2B701","#66C5CC","#80BA5A","#F6CF71" 
+)
+output_dir <- "../output/plots/MOFA/np_weight/"
+
+dir.create(output_dir, showWarnings = FALSE)
+
+plot_list <- list()
+n=0
+for (i in names(data_list)) {
+  n=n+1
+  o1 <- plot_custom_weights(mofa, view = i, factors = 3, nfeatures = 6, title = i, fill_color = rev(mop_cells_palette)[n])
+
+  ggsave(plot = o1, filename = paste0(output_dir, "/", i, ".pdf"), width = 6, height = 4)
+
+  plot_list[[i]] <- o1
+}
+
+combined_plot <- wrap_plots(plot_list)
+
+ggsave(plot = combined_plot, filename = paste0(output_dir, "/combined_plot.pdf"), width = 20, height = 18)
+```
+
+```{r}
+library(pheatmap)
+
+Weight_plot_and_heatmap <- function(view_name, sign = "negative") {
+
+  weight_plot <- plot_top_weights(mofa, 
+                                  view = view_name, 
+                                  factors = 3, 
+                                  sign = sign,
+                                  nfeatures = 2)
+
+  view_data <- data_list[[view_name]]
+
+  selected_features <- view_data[rownames(view_data) %in% weight_plot$data$feature, ]
+
+  pheatmap::pheatmap(selected_features, cluster_rows = FALSE, cluster_cols = FALSE, border_color = "white")
+}
+
+
+# plot_and_heatmap("Naive_CD8_T", sign = "positive")
+```
+
+```{r}
+w1=plot_top_weights(mofa, 
+  view = "CD4TCR", 
+  factors = 3, 
+  sign = "positive",
+  nfeatures = 2,
+)
+w1
+```
+
+
+```{r}
+
+# view_data1 <- model[["CD4TCR"]]
+# intersect(rownames(view_data1) ,as.vector(w1$data$feature))
+# selected_features1 <- model@data$CD4TCR$group1[rownames(model@data$CD4TCR$group1) %in% as.vector(w1$data$feature), ] %>% as.data.frame()
+```
+
+```{r}
+library(pheatmap)
+
+Weight_npdata <- function(view_name, sign = "negative",factors = 3,nfeatures=2) {
+
+  weight_plot <- plot_top_weights(mofa, 
+                                  view = view_name, 
+                                  factors = factors, 
+                                  sign = sign,
+                                  nfeatures = nfeatures)
+
+  view_data <-  model@data[[view_name]]$group1
+
+  selected_features <- view_data[rownames(view_data) %in% weight_plot$data$feature, ] %>% as.data.frame()
+  selected_features
+  
+  return(selected_features)
+}
+
+
+Weight_npdata("Naive_CD8_T", sign = "positive") %>% as.data.frame()
+
+WeightP=data.frame()
+for (i in names(data_list)) {
+  print(i)
+  o2 <- Weight_npdata(i, sign = "positive") %>% as.data.frame()
+  o2$np<-"positive"
+  o2$type=i
+  WeightP=rbind(WeightP,o2)
+  
+  
+}
+
+
+```
+
+
+
+```{r}
+
+WeightP=data.frame()
+for (i in names(data_list)) {
+  print(i)
+  o2 <- Weight_npdata(i, sign = "positive",nfeatures=2) %>% as.data.frame()
+  o2$np<-"positive"
+  o2$type=i
+  WeightP=rbind(WeightP,o2)
+  
+  
+}
+WeightN=data.frame()
+for (i in names(data_list)) {
+  print(i)
+  o2 <- Weight_npdata(i, sign = "negative",nfeatures=2) %>% as.data.frame()
+  o2$np<-"negative"
+  o2$type=i
+  WeightN=rbind(WeightN,o2)
+  
+  
+}
+Weight_all=rbind(WeightP,WeightN)
+```
+
+
+
+```{r}
+# WeightN=data.frame()
+# for (i in names(data_list)) {
+#   print(i)
+#   o2 <- Weight_npdata(i, sign = "negative") %>% as.data.frame()
+#   o2$np<-"negative"
+#   o2$type=i
+#   WeightN=rbind(WeightN,o2)
+#   
+#   
+# }
+# Weight_all=rbind(WeightP,WeightN)
+```
+```{r}
+pheatmap(Weight_all[,-c(17,18,19)],cluster_rows = F,cluster_cols = F,border_color = "white")
+```
+```{r}
+# Weight_all
+```
+
+```{r}
+
+library(tidyverse)
+ Weight_all$features=rownames( Weight_all)
+Weight_long <- Weight_all %>%
+  pivot_longer(
+    cols = -c(np, type,features), 
+    names_to = "variable", 
+    values_to = "value"
+  )
+
+Ph=ggplot(Weight_long, aes(x =features, y = type, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  facet_grid(type ~ ., scales = 'free', space = 'free',  switch = "x") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Heatmap of Weight Data", x = "Variable", y = "NP")
+Ph
+```
+```{r}
+Weight_long <- Weight_all %>%
+  pivot_longer(
+    cols = -c(np, type,features), 
+    names_to = "variable", 
+    values_to = "value"
+  )
+
+```
+```{r}
+DataCell=data.frame( Oldview=c(
+    "BCR", "CD14xPPBPx_Monocytes", "CD4TCR", "CD56highCD16low_NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical_Monocytes", "CX3CR1x_NK", "CXCR5high_Naive_B", 
+    "CXCR5low_Naive_B", "CXCR6x_NK", "DC2", "Gamma_Delta_V2_T", 
+    "HSC_MPP", "MEMP", "MEP", "MyeloidxCD177", "Naive_CD4_T", 
+    "Naive_CD8_T", "NK_T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  ),
+
+  View =c(
+    "BCR", "CD14+PPBP+ Monocytes", "CD4TCR", "CD56highCD16low NK", 
+    "CD8TCR", "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+    "Classical Monocytes", "CX3CR1+ NK", "CXCR5+ Naïve B", 
+    "CXCR5- Naïve B", "CXCR6+ NK", "DC2", "Gamma Delta V2 T", 
+    "HSC_MPP", "MEMP", "MEP", "Myeloid-CD177", "Naïve CD4 T", 
+    "Naïve CD8 T", "NK T", "pDC", "Plama_Olink", "Sflow_Freq_inParent", 
+    "Th17like_INNATE_T", "Treg"
+  ))
+# Count=merge(dataCell,dims,by.x="old",by.y="row.names")
+```
+
+```{r}
+Weight_long=merge(Weight_long,DataCell,by.x="type",by.y="Oldview")
+```
+```{r}
+
+```
+
+
+```{r}
+Weight_long$features<-gsub("_CDR3b_length_","-CDR3b-length-",Weight_long$features)
+Weight_long$features %>% unique()
+Weight_long <- Weight_long %>%
+  mutate(features2 = str_remove(features, ".*__"))
+Weight_long <- Weight_long %>%
+  mutate(features2 = case_when(
+    str_detect(features2, "TCR") ~ features2,
+    str_detect(features2, "Olink") ~ str_replace(features2, "_.*$", ""),
+    TRUE ~ str_replace(features2, ".*_(.*)$", "\\1")
+  ))
+# Weight_long$features %>% unique()
+# Weight_long$features %>% unique()[grep()]
+Weight_long$features %>% unique()
+```
+```{r}
+levels(factor(Weight_long$variable))
+Weight_long$View<-factor(Weight_long$View,levels = sorted_values)
+```
+```{r}
+unique(Weight_long$features2)
+Weight_long$features2=gsub("CXCR5.B.1" ,"CXCR5+ B" ,Weight_long$features2) %>% 
+gsub("CXCR5.B" ,"CXCR5- B" ,.)%>% gsub("Inhibitory.CD8.T" ,"Inhibitory CD8+T" ,.)%>% gsub("_CD4TCR" ,"" ,.)%>% gsub("_CD8TCR" ,"" ,.)
+```
+
+```{r}
+Weight_long$Allngsample<-paste0(Weight_long$np,"_",Weight_long$variable)
+```
+```{r}
+all_heatmap2= ggplot(data =Weight_long,
+                     mapping = aes(x =Allngsample , y =features2 , fill = value)) +
+    scale_fill_gradient2(low = '#334555', mid = "white", high = '#8E328A', midpoint = 0) +
+    geom_tile() +
+    facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  
+          axis.text.y = element_text(hjust = 1, vjust = 1),
+          strip.background = element_rect(color = "black", fill = "white", linetype = "solid"),
+          strip.placement = "outside",
+          strip.switch.pad.grid = unit(0.4, "cm"),
+          strip.text.y.left = element_text(angle = 0)) +
+    labs(title = "Normalized Expression Values of Top Features",
+         x = "Sample ID",
+         y = "Gene")+ theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0))+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Top2 Features in Each View for Factor3'))+ylab("")
+all_heatmap2
+# ggsave(plot =all_heatmap2 ,"../output/plots/MOFA/all_heatmap2.pdf",width = 7,height = 16)
+```
+
+
+```{r}
+all_heatmap2down = ggplot(data = subset(Weight_long,np=="negative"),
+                     mapping = aes(x =variable , y =features2 , fill = value)) +
+    scale_fill_gradient2(low = '#334555', mid = "white", high = '#8E328A', midpoint = 0) +
+    geom_tile() +
+    facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  
+          axis.text.y = element_text(hjust = 1, vjust = 1),
+          strip.background = element_rect(color = "black", fill = "white", linetype = "solid"),
+          strip.placement = "outside",
+          strip.switch.pad.grid = unit(0.4, "cm"),
+          strip.text.y.left = element_text(angle = 0)) +
+    labs(title = "Normalized Expression Values of Top Features",
+         x = "Sample ID",
+         y = "Gene")+ theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0))+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Top2 Features in Each View for Factor3'))+ylab("")
+all_heatmap2down 
+ggsave(plot =all_heatmap2down ,"../output/plots/MOFA/all_heatmap2down.pdf",width = 7,height = 10)
+```
+
+```{r}
+ggsave(plot = all_heatmap2down,"../output/plots/MOFA/all_heatmap2down.pdf")
+```
+
+```{r}
+all_heatmap2up = ggplot(data = subset(Weight_long,np=="positive"),
+                     mapping = aes(x =variable , y =features2 , fill = value)) +
+    scale_fill_gradient2(low = '#334555', mid = "white", high = '#8E328A', midpoint = 0) +
+    geom_tile() +
+    facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  
+          axis.text.y = element_text(hjust = 1, vjust = 1),
+          strip.background = element_rect(color = "black", fill = "white", linetype = "solid"),
+          strip.placement = "outside",
+          strip.switch.pad.grid = unit(0.4, "cm"),
+          strip.text.y.left = element_text(angle = 0)) +
+    labs(title = "Normalized Expression Values of Top Features",
+         x = "Sample ID",
+         y = "Gene")+ theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0),legend.position = "none")+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Top2 Features in Each View for Factor3'))+ylab("")
+
+all_heatmap2up
+ggsave(plot = all_heatmap2up,"../output/plots/MOFA/all_heatmap2up.pdf",width = 7,height = 10)
+```
+```{r}
+all_heatmap2down3 = ggplot(data = subset(Weight_long,np=="negative"),
+                     mapping = aes(x =variable , y =features2 , fill = value)) +
+    scale_fill_gradient2(low = '#334555', mid = "white", high = '#8E328A', midpoint = 0) +
+    geom_tile() +
+    facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  
+          axis.text.y = element_text(hjust = 1, vjust = 1),
+          strip.background = element_rect(color = "black", fill = "white", linetype = "solid"),
+          strip.placement = "outside",
+          strip.switch.pad.grid = unit(0.1, "cm"),
+          strip.text.y.left = element_text(angle = 0)) +
+    labs(title = "Normalized Expression Values of Top Features",
+         x = "Sample ID",
+         y = "Gene")+ theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0))+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Top2 Features in Each View for Factor3'))+ylab("")
+all_heatmap2down 
+# ggsave(plot =all_heatmap2down ,"../output/plots/MOFA/all_heatmap2down.pdf",width = 7,height = 10)
+all_heatmap2up3 = ggplot(data = subset(Weight_long,np=="positive"),
+                     mapping = aes(x =variable , y =features2 , fill = value)) +
+    scale_fill_gradient2(low = '#334555', mid = "white", high = '#8E328A', midpoint = 0) +
+    geom_tile() +
+    # facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    facet_grid(View ~ np, scales = 'free', space = 'free', switch = "y") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),  
+          axis.text.y = element_text(hjust = 1, vjust = 1),
+          strip.background = element_rect(color = "black", fill = "white", linetype = "solid"),
+          strip.placement = "outside",
+          strip.switch.pad.grid = unit(0.4, "cm"), 
+          strip.text.y.left = element_text(angle = 0)) +
+    labs(title = "Normalized Expression Values of Top Features",
+         x = "Sample ID",
+         y = "Gene")+ theme(strip.background = element_rect(color="black", fill="white", linetype="solid"), strip.placement = "outside", strip.switch.pad.grid = unit(0.4, "cm"), strip.text.y.left = element_text(angle=0),legend.position = "none")+
+    theme( axis.text.y = element_text( hjust = 1, vjust =1)) + 
+    ggtitle(paste0('Top2 Features in Each View for Factor3'))+ylab("")
+
+all_heatmap2up
+combined_plot3 <- all_heatmap2up3 + all_heatmap2down3 + plot_layout(ncol = 2)
+
+# 显示拼接后的图
+print(combined_plot3)
+
+# 保存拼接后的图
+ggsave(plot = combined_plot3, "../output/plots/MOFA/combined_heatmap2.pdf", width = 12, height = 10)
+# ggsave(plot = combined_plot, "../output/plots/MOFA/combined_heatmap2.pdf", width = 6, height = 10)
+# ggsave(plot = all_heatmap2up,"../output/plots/MOFA/all_heatmap2up.pdf",width = 7,height = 10)
+```
+
+```{r}
+combined_plot <- all_heatmap2up + all_heatmap2down + plot_layout(ncol = 2)
+
+# 显示拼接后的图
+print(combined_plot)
+
+# 保存拼接后的图
+ggsave(plot = combined_plot, "../output/plots/MOFA/combined_heatmap.pdf", width = 14, height = 10)
+# ggsave(plot = combined_plot, "../output/plots/MOFA/combined_heatmap2.pdf", width = 6, height = 10)
+```
+
+
+
+
+```{r}
+Alld=get_data(model,as.data.frame = T)
+final_data_long2=final_data_long
+unique(final_data_long2$type)
+final_data_long2$type<-str_replace_all( final_data_long2$type , '__|\\.|\\.\\.|\\.\\.\\.', '')
+Allw=get_weights(model,as.data.frame = T)
+
+Allw=subset(Allw,factor=="Factor3")
+Allw$factor3value=Allw$value
+final_data_long2$fID<-paste0(final_data_long2$type,"_",final_data_long2$variable)
+colnames(final_data_long2)<-c( "sample_id", "variable"  ,"Svalue" ,    "type"     , "fID")
+Allw$fID<-paste0(Allw$view,"_",Allw$feature)
+All2=merge(final_data_long2,Allw,by="fID")
+
+All3=All2[All2$type %in%names(data_list)[c(4,8:25)], ]
+```
+```{r}
+table(All2$value>0)
+```
+```{r}
+table(All2$factor3value>1)
+```
+```{r}
+table(All2$factor3value>2)
+max(All2$factor3value)
+```
+
+
+```{r}
+get_top_weight<-function (object, view = 1, factors = 1, nfeatures = 10, abs = TRUE, 
+    scale = TRUE, sign = "all") 
+{
+    if (!is(object, "MOFA")) 
+        stop("'object' has to be an instance of MOFA")
+    if (nfeatures <= 0) 
+        stop("'nfeatures' has to be greater than 0")
+    if (sign == "all") {
+        abs <- TRUE
+    }
+
+    W <- get_weights(object, factors = factors, views = view, 
+        as.data.frame = TRUE)
+    if (scale) 
+        W$value <- W$value/max(abs(W$value))
+    W <- W[W$value != 0, ]
+    W$sign <- ifelse(W$value > 0, "+", "-")
+    if (sign == "positive") {
+        W <- W[W$value > 0, ]
+    }
+    else if (sign == "negative") {
+        W <- W[W$value < 0, ]
+    }
+    if (abs) 
+        W$value <- abs(W$value)
+    W <- W[with(W, order(-abs(value))), ]
+    W <- as.data.frame(top_n(group_by(W, factor), n = nfeatures, 
+        wt = value))
+    W$feature_id <- W$feature
+    if ((length(unique(W$view)) > 1) && (nfeatures > 0) && (any(duplicated(W[W$factor == 
+        factors[1], ]$feature_id)))) {
+        message("Duplicated feature names across views, we will add the view name as a prefix")
+        W$feature_id <- paste(W$view, W$feature, sep = "_")
+    }
+    W$feature_id <- factor(W$feature_id, levels = rev(unique(W$feature_id)))
+
+    return(W)
+}
+```
+
+```{r}
+
+getw2=data.frame()
+for (i in names(data_list)[c(4,8:25)]) {
+  da1=get_top_weight(mofa,view=i ,factors = 3, 
+  sign = "positive",
+  nfeatures = 100)
+  da1$sign2<-"positive"
+  da2=get_top_weight(mofa,view=i ,factors = 3, 
+  sign = "negative",
+  nfeatures = 100)
+   da2$sign2<-"negative"
+  da3=rbind(da1,da2)
+  getw2=rbind(getw2,da3)
+}
+getw3=subset(getw2)
+table(getw3$view)
+
+```
+```{r}
+getw3$feature <- sub(".*__", "", getw3$feature) %>% gsub("_Cell_stimulate_BulkRNA","",.)
+getw3
+getw3$group<-paste0(getw3$sign2,"_",getw3$view)
+```
+```{r}
+unique(getw3$feature)
+```
+
+```{r}
+library(dplyr)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(DOSE)
+library(ggplot2)
+library(RColorBrewer)
+# columns(org.Hs.eg.db)
+```
+```{r}
+# 加载必要的包
+library(dplyr)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+
+
+getw3$group <- paste(getw3$sign2, getw3$view, sep = "_")
+
+
+unique_groups <- unique(getw3$group)
+
+perform_enrichment_analysis <- function(features) {
+
+  diff_entrez <- bitr(features, 
+                      fromType = "SYMBOL", 
+                      toType = "ENTREZID", 
+                      OrgDb = "org.Hs.eg.db")
+
+  if (nrow(diff_entrez) == 0) {
+    warning("No valid Entrez IDs found for the given features.")
+    return(NULL)
+  }
+  
+
+  # KEGG_diff <- enrichKEGG(gene = diff_entrez$ENTREZID,
+  #                         organism = "hsa",
+  #                         pvalueCutoff = 0.05,
+  #                         qvalueCutoff = 0.25,
+  #                         pAdjustMethod = "BH",
+  #                         minGSSize = 10,
+  #                         maxGSSize = 1000)
+  
+
+  ego <- enrichGO(gene = features,
+                  OrgDb = org.Hs.eg.db, 
+                  keyType = "SYMBOL", 
+                  ont = "BP",
+                  pAdjustMethod = "BH",
+                  minGSSize = 1,
+                  pvalueCutoff = 0.05, 
+                  qvalueCutoff = 0.05,
+                  readable = TRUE)
+  return(list( GO = ego))
+}
+
+
+
+```
+```{r}
+getw3$feature<-as.character(getw3$feature)
+```
+```{r}
+library(foreach)
+library(doParallel)
+# 初始化并行环境
+n_cores <- detectCores() - 1  
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+enrichment_results <- foreach(grp = unique_groups, .packages = c("dplyr", "clusterProfiler", "org.Hs.eg.db")) %dopar% {
+  print(grp)
+  featuresd <- subset(getw3, group == grp)$feature
+
+  enrichment_result <- perform_enrichment_analysis(featuresd)
+ 
+  if (!is.null(enrichment_result)) {
+    list(grp = grp, result = enrichment_result)
+  } else {
+    warning(paste("Enrichment analysis failed for group:", grp))
+    NULL
+  }
+}
+
+stopCluster(cl)
+
+enrichment_results <- Filter(Negate(is.null), enrichment_results)
+
+```
+
+
+
+
+```{r}
+plot_and_save_dotplot <- function(enrichment_result, grp) {
+  if (!is.null(enrichment_result)) {
+    p <- dotplot(enrichment_result) + ggtitle(paste("GO Enrichment for Group:", grp))
+    ggsave(filename = paste0("../output/plots/MOFA/Fun/", grp, "_GO_plot.pdf"), plot = p, width = 20, height = 18)
+  }
+}
+
+for (grp in names(enrichment_results)) {
+  plot_and_save_dotplot(enrichment_results[[grp]]$GO, grp)
+}
+```
+```{r}
+enrichment_df <- data.frame()
+enrichment_df3 <- data.frame()
+
+for (res in enrichment_results) {
+
+  grp <- res$grp
+
+  go_result <- res$result$GO
+  
+  if (!is.null(go_result) && nrow(go_result) > 0) {
+   
+    plot_and_save_dotplot(go_result, grp)
+    
+    go_df <- as.data.frame(go_result)
+
+    go_df <- go_df %>% mutate(Group = grp)
+    go_df3<-head(go_df,3)
+
+    enrichment_df <- bind_rows(enrichment_df, go_df)
+     enrichment_df3 <- bind_rows(enrichment_df3, go_df3)
+  } else {
+    cat("No GO results for group:", grp, "\n")
+  }
+}
+
+
+print(head(enrichment_df, 20))
+
+write.csv(enrichment_df, "../output/plots/MOFA/Fun/AllfunBP.csv")
+```
+```{r}
+library(dplyr)
+
+enrichment_df<-enrichment_df[!grepl("cytoplasmic translation",enrichment_df$Description),]
+top3_by_count <- enrichment_df %>%
+  group_by(Group) %>%
+  arrange(Group, desc(Count)) %>%
+  slice_head(n = 3)
+top3_by_count <- enrichment_df %>%
+  group_by(Group) %>%
+  arrange(Group, desc(Count)) %>%
+  slice_head(n = 1)
+top3_by_padjust <- enrichment_df %>%
+  group_by(Group) %>%
+  arrange(Group, p.adjust) %>%
+  slice_head(n = 3)
+top1_by_padjust <- enrichment_df %>%
+  group_by(Group) %>%
+  arrange(Group, p.adjust) %>%
+  slice_head(n = 1)
+# 打印结果
+print("Top 3 by Count:")
+print(top3_by_count)
+
+print("Top 3 by Padjust:")
+print(top3_by_padjust)
+
+# 保存为CSV文件
+write.csv(top3_by_count, "../output/plots/MOFA/Fun/Top3_by_Count.csv", row.names = FALSE)
+write.csv(top3_by_padjust, "../output/plots/MOFA/Fun/Top3_by_Padjust.csv", row.names = FALSE)
+write.csv(top1_by_padjust, "../output/plots/MOFA/Fun/Top1_by_Padjust.csv", row.names = FALSE)
+write.csv(top3_by_count, "../output/plots/MOFA/Fun/Top1_by_Count.csv", row.names = FALSE)
+```
+
+
+```{r}
+top1_by_padjust<-read.csv("../output/plots/MOFA/Fun/Top1_by_Padjust.csv",header = T)
+```
+
+```{r}
+# 使用 strsplit 进行分割
+split_group <- strsplit(as.character(top1_by_padjust$Group), "_", fixed = TRUE)
+
+# 提取分割后的第一部分和第二部分
+group_first_parts <- sapply(split_group, `[`, 1)
+group_second_parts <- sapply(split_group, function(x) paste(x[-1], collapse = "_"))
+
+# 将新的列添加到数据框中
+top1_by_padjust$G1 <- group_first_parts
+top1_by_padjust$G2 <- group_second_parts
+
+# 查看结果
+print(top1_by_padjust)
+```
+```{r}
+top1_by_padjust=merge(top1_by_padjust,DataCell,by.x="G2",by="Oldview")
+```
+```{r}
+sorted_values <- c(
+  "HSC_MPP",       
+  "MEMP",            
+  "MEP",             
+
+  "Naïve CD4 T","Treg", "Naïve CD8 T", 
+   "Gamma Delta V2 T", 
+  "Th17like_INNATE_T",  
+  "NK T",  "CX3CR1+ NK", "CXCR6+ NK",
+  "CXCR5- Naïve B", "CXCR5+ Naïve B",   "Myeloid-CD177",   
+  "CD14+PPBP+ Monocytes", "Classical Monocytes", 
+  "DC2", "pDC",      
+  "Cell_stimulate_BulkRNA", "Cell_stimulate_Olink", 
+  "Plama_Olink", "Sflow_Freq_inParent","CD4TCR", "CD8TCR",  "BCR"
+)
+sorted_values<-rev(sorted_values)
+```
+```{r}
+sorted_values
+top1_by_padjust$View<-factor(top1_by_padjust$View,levels = rev(sorted_values))
+
+```
+```{r}
+positivet_top1_by_padjust=subset(top1_by_padjust,G1=="positive")
+```
+```{r}
+positivet_top1_by_padjust
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+library(dplyr)
+
+positivet_top1_by_padjust  <- positivet_top1_by_padjust %>%
+  arrange(View)
+
+positivet_top1_by_padjust$Description <- factor(positivet_top1_by_padjust$Description, levels = rev(unique(positivet_top1_by_padjust$Description)))
+
+Pg <- ggplot(positivet_top1_by_padjust, aes(x = Description, y = View, size = Count, color = p.adjust)) +
+  geom_point(alpha = 0.7) +
+  coord_flip() +
+  labs(title = "Top1 Pathways in Top100 Positive Features \n in Each View", x = "", y = "") +
+  theme_linedraw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_line(color = "lightgrey"),
+    panel.grid.minor = element_line(color = "lightgrey")
+  ) +
+  facet_grid(. ~ G1, scales = 'free', space = 'free', switch = "y") +
+  scale_color_gradient2(low = "#058786", mid = "#7eb5b4", high = '#224767', midpoint = median(neg_top1_by_padjust$p.adjust)) +
+  scale_size(breaks = function(x) pretty(x, n = 4),
+             labels = function(x) as.integer(x))
+Pg
+ggsave(plot = Pg,"../output/plots/MOFA/Positive_Enrichment.pdf",width = 8,height = 5)
+```
+
+```{r}
+# library(ggplot2)
+# Pg=ggplot(positivet_top1_by_padjust, aes(x = Description, y = View, size = Count, color = p.adjust)) +
+#   geom_point(alpha = 0.7) +
+#   coord_flip() +
+#   labs(title = "Top1 Pathways in Top100  positive Features in each views", x = "", y = "") +
+#   theme_linedraw() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))+facet_grid(. ~ G1, scales = 'free', space = 'free', switch = "y")
+# Pg
+# ggsave(plot = Pg,"../output/plots/MOFA/Pg.pdf",width = 9,height = 5)
+```
+
+
+```{r}
+neg_top1_by_padjust=subset(top1_by_padjust,G1=="negative")
+Negsorted_data <-neg_top1_by_padjust %>%
+  arrange(View)
+
+
+Negsorted_data$Description <- factor(Negsorted_data$Description, levels = unique(Negsorted_data$Description))
+```
+
+```{r}
+positivet_top1_by_padjust
+max(positivet_top1_by_padjust$Count)
+```
+
+
+```{r}
+library(ggplot2)
+
+# Pg2 = ggplot(neg_top1_by_padjust, aes(x = Description, y = View, size = Count, color = p.adjust)) +
+#   geom_point(alpha = 0.7) +
+#   coord_flip() +
+#   labs(title = "Top1 Pathways in Top100 Negative Features in Each View", x = "", y = "") +
+#   theme_linedraw() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   facet_grid(. ~ G1, scales = 'free', space = 'free', switch = "y") +
+#   scale_color_gradient2(low = "#058786", mid = "#7eb5b4", high = "#ffffff", midpoint = median(neg_top1_by_padjust$p.adjust)) 
+# 
+#   # scale_size_continuous(range = c(5,20))
+# 
+# Pg2
+
+
+# ggsave(plot = Pg2,"../output/plots/MOFA/Pgnegative.pdf",width = 9,height = 5)
+```
+
+```{r}
+neg_top1_by_padjust$Description <- factor(neg_top1_by_padjust$Description, levels = rev(unique(neg_top1_by_padjust$Description[order(neg_top1_by_padjust$View)])))
+
+```
+
+```{r}
+# Pg=ggplot(positivet_top1_by_padjust, aes(x = Description, y = View, size = Count, color = p.adjust)) +
+#   geom_point(alpha = 0.7) +
+#   coord_flip() +
+#   labs(title = "Top1 Pathways in Top100 Negative Features \n in Each View", x = "", y = "") +
+#   theme_linedraw() +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     panel.grid.major = element_line(color = "lightgrey"),
+#     panel.grid.minor = element_line(color = "lightgrey")
+#   ) +
+#   facet_grid(. ~ G1, scales = 'free', space = 'free', switch = "y") +
+#   scale_color_gradient2(low = "#058786", mid = "#7eb5b4", high = '#224767', midpoint = median(neg_top1_by_padjust$p.adjust)) +
+#   scale_size(breaks = function(x) pretty(x, n = 4),
+#              labels = function(x) as.integer(x))
+# 
+# Pg
+```
+
+
+```{r}
+Pg2 =ggplot(neg_top1_by_padjust, aes(x = Description, y = View, size = Count, color = p.adjust)) +
+  geom_point(alpha = 0.7) +
+  coord_flip() +
+  labs(title = "Top1 Pathways in Top100 Negative Features \n in Each View", x = "", y = "") +
+  theme_linedraw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major = element_line(color = "lightgrey"),
+    panel.grid.minor = element_line(color = "lightgrey")
+  ) +
+  facet_grid(. ~ G1, scales = 'free', space = 'free', switch = "y") +
+  scale_color_gradient2(low = "#058786", mid = "#7eb5b4", high = '#224767', midpoint = median(neg_top1_by_padjust$p.adjust)) +
+  scale_size(breaks = function(x) pretty(x, n = 4),
+             labels = function(x) as.integer(x))
+
+Pg2
+ggsave(plot = Pg2,"../output/plots/MOFA/Negative_Enrichment_top1.pdf",width = 9,height = 5)
+```
+```{r}
+library(aplot)
+P2=Pg2 %>%  insert_top(Pg) 
+P2
+ggsave(plot = P2,"../output/plots/Enrich.pdf",width = 9,height = 10)
+```
+
+
+
+
+
+```{r}
+Olinkmeta=read.csv("/home/maolp/data5/Gaofeng_All_matrix/Allcount/All_scanpyData/MetaData/Olinkgene.csv")
+```
+
+```{r}
+Allngsampledata$type=str_replace_all(Allngsampledata$type, '__|\\.|\\.\\.|\\.\\.\\.', '')
+```
+
+
+```{r}
+Allngsampledata=final_data_long
+Allngsampledata$variable<-sub(".*__", "", Allngsampledata$variable)
+Allngsampledata
+```
+```{r}
+unique(Allngsampledata$type)
+```
+```{r}
+SingleCell<-Allngsampledata[Allngsampledata$type %in% unique(Allngsampledata$type)[8:25],]
+SingleCell<-SingleCell[SingleCell$variable %in% Olinkmeta$Gene,]
+```
+```{r}
+table(SingleCell$variable)
+```
+
+
+
+```{r}
+Polink<-Allngsampledata[grep("Plam",Allngsampledata$type),]
+Polink$variable<- gsub("\\.", "-", Polink$variable)
+Polink2=merge(Polink,Olinkmeta,by.x="variable",by.y="Assay")
+```
+```{r}
+for (i in unique(SingleCell$variable)) {
+  
+  for (j in unique(SingleCell$type)) {
+    print(j)
+    
+   Sing_tem= subset(SingleCell,type==j&variable==i)
+   Polink_tem=subset(Polink,Gene==i)
+    
+  }
+  
+}
+```
+
+```{r}
+
+library(tidyr)
+library(dplyr)
+library(ComplexHeatmap)
+library(circlize)
+
+wide_Polink <- Polink %>%
+  pivot_wider(names_from = variable, values_from = value)
+
+wide_Polink <- wide_Polink %>% select(-sample_id, -type)
+
+correlation_matrix <- cor(wide_Polink, use = "pairwise.complete.obs", method = "spearman")
+
+print(correlation_matrix)
+
+Olinkheatmap=Heatmap(correlation_matrix,
+        name = "Spearman Correlation",
+        col = colorRamp2(c(-1, 0, 1), c("blue", "white", "red")),
+        show_row_names = TRUE,
+        show_column_names = TRUE,
+        cluster_rows = TRUE,
+        cluster_columns = TRUE)
+pdf("../output/plots/MOFA/Olink_corheatmap.pdf",width = 15,height = 14)
+draw(Olinkheatmap)
+dev.off()
+```
+
+```{r}
+
+if (!requireNamespace("qvalue", quietly = TRUE)) {
+  install.packages("qvalue")
+}
+
+library(qvalue)
+
+correlation_df <- data.frame(
+  variable = character(),
+  type = character(),
+  correlation = numeric(),
+  p_value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (i in unique(SingleCell$variable)) {
+  for (j in unique(SingleCell$type)) {
+
+    print(j)
+
+    Sing_tem <- subset(SingleCell, type == j & variable == i)
+    Polink_tem <- subset(Polink2, Gene == i)
+    CX$Scvalue=CX$value
+    Polink_tem2 <- subset(Polink2, Gene ==  i)
+    Polink_tem2$Olinkvalue<-Polink_tem2$value
+    CX2=merge(CX,Polink_tem2,by="sample_id")
+
+    if (nrow(Sing_tem) > 0 && nrow(Polink_tem) > 0) {
+
+      test_result <- cor.test(CX2$Scvalue, CX2$Olinkvalue, method = "spearman")
+
+      correlation_df <- rbind(correlation_df, data.frame(
+        variable = i, 
+        type = j, 
+        correlation = test_result$estimate, 
+        p_value = test_result$p.value
+      ))
+    }
+  }
+}
+
+
+# q_vals <- qvalue(correlation_df$p_value)$qvalues
+# correlation_df$q_value <- q_vals
+
+if (nrow(correlation_df) > 0) {
+
+  correlation_df$bonferroni <- p.adjust(correlation_df$p_value, method = "bonferroni")
+
+  correlation_df$BH <- p.adjust(correlation_df$p_value, method = "BH")
+
+  correlation_df$BY <- p.adjust(correlation_df$p_value, method = "BY")
+}
+
+
+print(correlation_df)
+print(correlation_df)
+```
+
+
+
+
